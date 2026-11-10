@@ -1,0 +1,17 @@
+{
+  "name": "씨앤씨 영업 현황",
+  "short_name": "씨앤씨 영업",
+  "description": "견적·매출 입력, 견적·매출 현황, 유상수리(PDA·라벨프린터·산업용장비) 진행 조회",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f4f7",
+  "theme_color": "#3182f6",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

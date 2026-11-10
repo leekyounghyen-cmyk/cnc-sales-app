@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>씨앤씨 영업 현황</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#f2f4f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1013" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="씨앤씨 영업">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+  :root { --bg:#f2f4f7; --fg:#191f28; --mut:#8b95a1; --card:#fff; --pri:#3182f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1013; --fg:#eef0f3; --mut:#7e8792; --card:#1b1e23; --pri:#4c95ff; } }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif; overflow:hidden; }
+  #app { position:fixed; left:0; right:0; bottom:0; top:env(safe-area-inset-top); width:100%; height:calc(100% - env(safe-area-inset-top)); border:0; background:var(--bg); }
+  #splash { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:var(--bg); z-index:5; transition:opacity .25s; }
+  #splash img { width:88px; height:88px; border-radius:22px; }
+  #splash b { font-size:20px; }
+  #splash span { font-size:14px; color:var(--mut); }
+  #splash.off { opacity:0; pointer-events:none; }
+  #install { position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:6; display:none; align-items:center; gap:10px;
+    background:var(--card); color:var(--fg); border-radius:16px; padding:12px 12px 12px 14px; box-shadow:0 6px 24px rgb(0 0 0/.18); font-size:14px; line-height:1.4; }
+  #install.on { display:flex; }
+  #install img { width:40px; height:40px; border-radius:10px; flex:0 0 auto; }
+  #install div { flex:1; min-width:0; }
+  #install button { border:0; font:inherit; font-weight:700; border-radius:10px; padding:9px 12px; cursor:pointer; }
+  #iBtn { background:var(--pri); color:#fff; }
+  #iX { background:none; color:var(--mut); padding:9px 6px !important; }
+  #offline { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; background:var(--bg); z-index:7; text-align:center; padding:24px; }
+  #offline.on { display:flex; }
+  #offline button { border:0; background:var(--pri); color:#fff; font-size:16px; font-weight:700; border-radius:12px; padding:12px 20px; }
+</style>
+</head>
+<body>
+<div id="splash"><img src="icons/icon-192.png" alt=""><b>씨앤씨 영업 현황</b><span>불러오는 중…</span></div>
+<iframe id="app" title="씨앤씨 영업 현황" allow="clipboard-write"></iframe>
+<div id="install"><img src="icons/icon-192.png" alt=""><div id="iText"><b>앱으로 설치</b><br><span id="iHow">홈 화면에 추가하면 앱처럼 쓸 수 있어요</span></div><button id="iBtn" type="button">설치</button><button id="iX" type="button" aria-label="닫기">✕</button></div>
+<div id="offline"><b style="font-size:20px">인터넷 연결이 없어요</b><span style="color:var(--mut)">연결된 뒤 다시 시도해 주세요</span><button type="button" onclick="location.reload()">다시 시도</button></div>
+<script>
+  // ▼ Apps Script 웹 앱 주소 (배포 URL이 바뀌면 여기만 고치면 됨)
+  var APP_URL = 'https://script.google.com/macros/s/AKfycbw6Qsi7ZVZktH4xutPdGWHkYaM1u2nw6HGJDN3u8mBQVk0sbqBTpPliLXGwn20O_ix8/exec';
+
+  var frame = document.getElementById('app'), splash = document.getElementById('splash');
+  function start() {
+    if (!navigator.onLine) { document.getElementById('offline').classList.add('on'); return; }
+    frame.src = APP_URL;
+    frame.addEventListener('load', function () { setTimeout(function () { splash.classList.add('off'); }, 300); });
+    setTimeout(function () { splash.classList.add('off'); }, 12000);
+  }
+  start();
+  window.addEventListener('online', function () { if (!frame.src) location.reload(); });
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+
+  // 설치 안내 (이미 앱으로 설치해서 열었거나, 닫은 적 있으면 안 보임)
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  var dismissed = false; try { dismissed = localStorage.getItem('installDismissed') === '1'; } catch (e) {}
+  var bar = document.getElementById('install'), how = document.getElementById('iHow'), btn = document.getElementById('iBtn'), deferred = null;
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (!standalone && !dismissed) {
+    if (ios) { how.textContent = '사파리 아래 공유 버튼(□↑) → 「홈 화면에 추가」'; btn.style.display = 'none'; setTimeout(function () { bar.classList.add('on'); }, 1500); }
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; bar.classList.add('on'); });
+    if (!ios) setTimeout(function () { if (!deferred) { how.textContent = '브라우저 메뉴(⋮) → 「홈 화면에 추가」 또는 「앱 설치」'; btn.style.display = 'none'; bar.classList.add('on'); } }, 4000);
+  }
+  btn.addEventListener('click', function () {
+    if (!deferred) return;
+    deferred.prompt();
+    deferred.userChoice.then(function () { bar.classList.remove('on'); deferred = null; });
+  });
+  document.getElementById('iX').addEventListener('click', function () {
+    bar.classList.remove('on'); try { localStorage.setItem('installDismissed', '1'); } catch (e) {}
+  });
+  window.addEventListener('appinstalled', function () { bar.classList.remove('on'); });
+</script>
+</body>
+</html>

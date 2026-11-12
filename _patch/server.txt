@@ -1,0 +1,108 @@
+// ───── 휴대폰 푸시 (Web Push · VAPID) — P-256 서명 (Apps Script에 ECDSA가 없어 직접 계산) ─────
+var P256_ = (function () {
+  var p = BigInt('0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff');
+  var n = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+  var Gx = BigInt('0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296');
+  var Gy = BigInt('0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5');
+  var Z = BigInt(0), O = BigInt(1), T2 = BigInt(2), T3 = BigInt(3), T4 = BigInt(4), T8 = BigInt(8);
+  function md(a, m) { a = a % m; return a < Z ? a + m : a; }
+  function inv(a, m) { var lm = O, hm = Z, low = md(a, m), high = m; while (low > O) { var r = high / low, nm = hm - lm * r, nw = high - low * r; hm = lm; high = low; lm = nm; low = nw; } return md(lm, m); }
+  function dbl(P) { var X = P[0], Y = P[1], Zc = P[2]; if (Zc === Z || Y === Z) return [Z, O, Z];
+    var YY = md(Y * Y, p), S = md(T4 * X * YY, p), ZZ = md(Zc * Zc, p), M = md(T3 * (X - ZZ) * (X + ZZ), p);
+    var X3 = md(M * M - T2 * S, p); return [X3, md(M * (S - X3) - T8 * YY * YY, p), md(T2 * Y * Zc, p)]; }
+  function add(P, Q) { if (P[2] === Z) return Q; if (Q[2] === Z) return P;
+    var Z1Z1 = md(P[2] * P[2], p), Z2Z2 = md(Q[2] * Q[2], p), U1 = md(P[0] * Z2Z2, p), U2 = md(Q[0] * Z1Z1, p);
+    var S1 = md(P[1] * Q[2] * Z2Z2, p), S2 = md(Q[1] * P[2] * Z1Z1, p);
+    if (U1 === U2) return S1 === S2 ? dbl(P) : [Z, O, Z];
+    var H = md(U2 - U1, p), R = md(S2 - S1, p), HH = md(H * H, p), HHH = md(H * HH, p), V = md(U1 * HH, p);
+    var X3 = md(R * R - HHH - T2 * V, p); return [X3, md(R * (V - X3) - S1 * HHH, p), md(P[2] * Q[2] * H, p)]; }
+  function mulG(k) { var R = [Z, O, Z], Q = [Gx, Gy, O]; while (k > Z) { if (k & O) R = add(R, Q); Q = dbl(Q); k = k >> O; } return R; }
+  function toX(P) { var zi = inv(P[2], p); return md(P[0] * zi * zi, p); }
+  function toY(P) { var zi = inv(P[2], p); return md(P[1] * zi * zi * zi, p); }
+  function b2i(b) { var h = ''; for (var i = 0; i < b.length; i++) h += ('0' + (b[i] & 255).toString(16)).slice(-2); return BigInt('0x' + (h || '0')); }
+  function i2b(x, len) { var h = x.toString(16); while (h.length < len * 2) h = '0' + h; var out = []; for (var i = 0; i < len; i++) out.push(parseInt(h.substr(i * 2, 2), 16)); return out; }
+  function sha(bytes) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes.map(function (v) { return v > 127 ? v - 256 : v; })); }
+  return {
+    // msg: 문자열 → 서명 64바이트(r||s)
+    sign: function (msg, dB64) {
+      var d = b2i(Utilities.base64DecodeWebSafe(dB64)), mb = Utilities.newBlob(msg).getBytes();
+      var e = b2i(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, mb));
+      for (var tries = 0; tries < 8; tries++) {
+        var seed = i2b(d, 32).concat(i2b(e, 32), Utilities.newBlob(Utilities.getUuid() + Utilities.getUuid() + Date.now()).getBytes().map(function (v) { return v & 255; }));
+        var k = md(b2i(sha(seed)), n); if (k === Z) continue;
+        var r = md(toX(mulG(k)), n); if (r === Z) continue;
+        var s = md(inv(k, n) * (e + r * d), n); if (s === Z) continue;
+        return i2b(r, 32).concat(i2b(s, 32));
+      }
+      throw new Error('서명 실패');
+    },
+    pub: function (dB64) { var P = mulG(b2i(Utilities.base64DecodeWebSafe(dB64))); return [4].concat(i2b(toX(P), 32), i2b(toY(P), 32)); }
+  };
+})();
+var PUSH_PUB = 'BNg0ug4KUwXkYnCq-qlsYZTjf1LMtqbZpkpRAWvODwM_0nyjmywrL1KHu9_IZLMWWAYKhnlT9QMyL491gDsHKBQ';   // 공개키 (시작 페이지 index.html 과 같은 값)
+function pushSubs_(uid) { try { return JSON.parse(props_().getProperty('push:' + uid) || '[]'); } catch (e) { return []; } }
+function pushSave_(uid, list) { if (list.length) props_().setProperty('push:' + uid, JSON.stringify(list.slice(-6))); else props_().deleteProperty('push:' + uid); }
+function savePush_(token, sub, ua) {
+  var u = auth_(token), ep = String((sub && sub.endpoint) || '');
+  if (!/^https:\/\/[a-z0-9.-]+\//i.test(ep) || ep.length > 1000) throw new Error('잘못된 구독');
+  var list = pushSubs_(u.id).filter(function (s) { return s.e !== ep; });
+  list.push({ e: ep, ua: String(ua || '').slice(0, 40), at: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm') });
+  pushSave_(u.id, list);
+  return { ok: true, n: list.length };
+}
+function removePush_(token, ep) { var u = auth_(token); pushSave_(u.id, pushSubs_(u.id).filter(function (s) { return s.e !== ep; })); return { ok: true }; }
+// 푸시 보내기: 내용은 싣지 않고 "새 알림" 신호만 → 휴대폰이 앱 서버에서 최신 알림을 받아 띄움
+function pushSend_(uid) {
+  var d = props_().getProperty('VAPID_D'); if (!d || !uid) return 0;
+  var list = pushSubs_(uid), keep = [], sent = 0;
+  var b64 = function (x) { return Utilities.base64EncodeWebSafe(x).replace(/=+$/, ''); };
+  list.forEach(function (s) {
+    try {
+      var aud = s.e.match(/^https:\/\/[^\/]+/)[0];
+      var head = b64(Utilities.newBlob(JSON.stringify({ typ: 'JWT', alg: 'ES256' })).getBytes());
+      var body = b64(Utilities.newBlob(JSON.stringify({ aud: aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:klee@candc.co.kr' })).getBytes());
+      var sig = b64(P256_.sign(head + '.' + body, d).map(function (v) { return v > 127 ? v - 256 : v; }));
+      var res = UrlFetchApp.fetch(s.e, { method: 'post', muteHttpExceptions: true, payload: '', headers: { Authorization: 'vapid t=' + head + '.' + body + '.' + sig + ', k=' + PUSH_PUB, TTL: '86400', Urgency: 'high' } });
+      var code = res.getResponseCode();
+      if (code === 404 || code === 410) return;          // 앱을 지웠거나 알림을 끈 휴대폰 → 목록에서 뺌
+      if (code >= 200 && code < 300) sent++; else console.log('푸시 응답 ' + code + ': ' + res.getContentText().slice(0, 200));
+      keep.push(s);
+    } catch (e) { console.log('푸시 실패: ' + e.message); keep.push(s); }
+  });
+  if (keep.length !== list.length) pushSave_(uid, keep);
+  return sent;
+}
+// 알림을 받을 사람(담당자) + 관리자 모두에게 푸시
+function pushNoti_(uid) {
+  var ids = {}; if (uid) ids[uid] = 1;
+  try { allUsers_().forEach(function (x) { if (x.role === 'admin' && x.status === 'approved') ids[x.id] = 1; }); } catch (e) {}
+  Object.keys(ids).forEach(function (id) { try { pushSend_(id); } catch (e) { console.log('푸시 실패 ' + id + ': ' + e.message); } });
+}
+// 휴대폰이 푸시를 받으면 여기서 내용을 가져감 (안 읽은 알림, since 이후 것만)
+function pushFeed_(token, since) {
+  var u = auth_(token), adm = u.role === 'admin', s = Number(since) || 0, p = props_();
+  var rows = notiRows_(notiSheet_()).filter(function (r) { return (adm || r[1] === u.id) && !r[9] && r.row > s; });
+  var test = Number(p.getProperty('ptest:' + u.id) || 0); if (test) p.deleteProperty('ptest:' + u.id);
+  return { me: u.id, test: test > Date.now() - 600000, last: rows.length ? rows[rows.length - 1].row : s, n: rows.length,
+    items: rows.slice(-5).reverse().map(function (r) { return { id: r.row, at: r[0], kind: r[3], co: r[7], text: r[8] }; }) };
+}
+function pushTest(token) {
+  var u = auth_(token); props_().setProperty('ptest:' + u.id, String(Date.now()));
+  return { subs: pushSubs_(u.id).length, sent: pushSend_(u.id) };
+}
+function pushStatus(token) { var u = auth_(token); return { subs: pushSubs_(u.id).length }; }
+function apiOut_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function apiGet_(e) {
+  try {
+    if (e.parameter.api === 'noti') return apiOut_(pushFeed_(e.parameter.token, e.parameter.since));
+    return apiOut_({ error: 'unknown' });
+  } catch (err) { return apiOut_({ error: err.message === 'AUTH' ? 'AUTH' : '오류' }); }
+}
+function doPost(e) {
+  try {
+    var b = JSON.parse(e.postData.contents);
+    if (b.api === 'push') return apiOut_(savePush_(b.token, b.sub, b.ua));
+    if (b.api === 'unpush') return apiOut_(removePush_(b.token, b.endpoint));
+    return apiOut_({ error: 'unknown' });
+  } catch (err) { return apiOut_({ error: err.message === 'AUTH' ? 'AUTH' : '오류' }); }
+}

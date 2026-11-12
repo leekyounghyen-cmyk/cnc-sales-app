@@ -1,0 +1,46 @@
+  // ───── 휴대폰 앱(시작 페이지)과 연결: 로그인 정보 전달 · 휴대폰 알림 · 메뉴 ─────
+  var SHELL = '{{SHELL}}';   // web = 홈 화면 앱, apk = 안드로이드 앱, 빈칸 = 브라우저에서 바로 연 경우
+  function shell(m) { try { m.cnc = 1; window.top.postMessage(m, '*'); } catch (e) {} }
+  function shellToken() { if (S.token) shell({ t: 'token', token: S.token, name: S.me ? S.me.name : '' }); }
+  function hx(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function closeMenu() { var p = $('menuP'); if (p) p.remove(); }
+  function openMenu() {
+    if ($('menuP')) { closeMenu(); return; }
+    try { closeNoti(); } catch (e) {}
+    var adm = S.me && S.me.role === 'admin', role = adm ? '관리자' : S.me && S.me.role === 'eng' ? '엔지니어' : '영업';
+    var p = document.createElement('div'); p.id = 'menuP'; p.className = 'noti-p menu-p';
+    p.innerHTML = '<div class="mp-h"><span class="mp-av">' + hx(((S.me && S.me.name) || '?').slice(0, 1)) + '</span><div><b>' + hx(S.me ? S.me.name : '') + '</b><small>' + role + ' · ' + hx(S.me ? S.me.id : '') + '</small></div></div>' +
+      '<button type="button" data-m="push">🔔 휴대폰 알림 켜기<small id="mpPush">출고 완료되면 휴대폰으로 바로 알려줘요</small></button>' +
+      '<button type="button" data-m="ptest">📳 알림 테스트 보내기</button>' +
+      '<button type="button" data-m="pw">🔑 비밀번호 변경</button>' +
+      (adm ? '<button type="button" data-m="rep">📨 일일보고 메일 지금 보내기</button>' : '') +
+      '<button type="button" data-m="out" class="mp-out">↪ 로그아웃</button>';
+    document.body.appendChild(p);
+    call('pushStatus', [S.token], function (r) { var el = $('mpPush'); if (el && r && r.subs) el.textContent = '켜져 있어요 ✓ (휴대폰 ' + r.subs + '대)'; }, function () {});
+    p.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-m]'); if (!b) return;
+      var m = b.getAttribute('data-m'); closeMenu();
+      if (m === 'push') {
+        if (SHELL) { shellToken(); shell({ t: 'push' }); toast(SHELL === 'apk' ? '알림 허용 창이 뜨면 「허용」을 눌러 주세요' : '화면 아래 「알림 켜기」를 눌러 주세요'); }
+        else toast('홈 화면에 설치한 「씨앤씨」 앱에서 켤 수 있어요');
+      } else if (m === 'ptest') {
+        toast('테스트 알림을 보내는 중…');
+        call('pushTest', [S.token], function (r) {
+          shell({ t: 'check' });
+          toast(r && r.subs ? '보냈어요. 잠시 뒤 휴대폰 알림을 확인하세요' : SHELL === 'apk' ? '보냈어요. 휴대폰 알림을 확인하세요' : '아직 알림이 꺼져 있어요. 「휴대폰 알림 켜기」를 먼저 눌러 주세요');
+        });
+      } else if (m === 'pw') {
+        var o = prompt('지금 비밀번호'); if (!o) return;
+        var n = prompt('새 비밀번호 (8자 이상)'); if (!n) return;
+        call('changePassword', [S.token, o, n], function () { toast('비밀번호를 바꿨어요'); });
+      } else if (m === 'rep') {
+        toast('일일보고를 만드는 중… (20초 정도)'); call('adminSendReport', [S.token], function (r) { toast('보냈어요 ✓ ' + r); });
+      } else if (m === 'out') {
+        if (!confirm('로그아웃할까요?')) return;
+        call('logout', [S.token], function () {}, function () {});
+        toLogin('로그아웃했어요.');
+      }
+    });
+  }
+  $('bMenu').addEventListener('click', function (e) { e.stopPropagation(); openMenu(); });
+  document.addEventListener('click', function (e) { var p = $('menuP'); if (p && !p.contains(e.target)) closeMenu(); });

@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>씨앤씨 영업 현황</title>
+<meta name="description" content="씨앤씨 견적·매출, 유상수리 진행, 광고 현황을 한 곳에서">
+<meta property="og:type" content="website">
+<meta property="og:title" content="씨앤씨 영업 현황 앱">
+<meta property="og:description" content="눌러서 열고 홈 화면에 추가하면 앱처럼 쓸 수 있어요">
+<meta property="og:image" content="https://leekyounghyen-cmyk.github.io/cnc-sales-app/icons/icon-512.png">
+<meta property="og:url" content="https://leekyounghyen-cmyk.github.io/cnc-sales-app/">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -34,48 +40,124 @@
   #offline { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; background:var(--bg); z-index:7; text-align:center; padding:24px; }
   #offline.on { display:flex; }
   #offline button { border:0; background:var(--pri); color:#fff; font-size:16px; font-weight:700; border-radius:12px; padding:12px 20px; }
+  #inapp, #guide { position:fixed; inset:0; z-index:8; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:var(--bg); text-align:center; padding:28px; }
+  #inapp.on, #guide.on { display:flex; }
+  #inapp img, #guide img { width:76px; height:76px; border-radius:18px; }
+  #inapp b, #guide b { font-size:20px; }
+  #inapp p, #guide p { margin:0; font-size:15px; line-height:1.6; color:var(--fg); }
+  #inapp small, #guide small { color:var(--mut); font-size:13px; line-height:1.5; }
+  .big { border:0; background:var(--pri); color:#fff; font-size:17px; font-weight:700; border-radius:14px; padding:14px 22px; width:100%; max-width:320px; }
+  .sub { border:0; background:none; color:var(--mut); font-size:14px; padding:8px; text-decoration:underline; }
+  .steps { text-align:left; background:var(--card); border-radius:16px; padding:14px 16px; width:100%; max-width:340px; box-sizing:border-box; }
+  .steps div { padding:6px 0; font-size:15px; }
+  .arrow { position:fixed; bottom:calc(6px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); font-size:34px; animation:bob 1s infinite; }
+  @keyframes bob { 50% { transform:translate(-50%,8px); } }
 </style>
 </head>
 <body>
 <div id="splash"><img src="icons/icon-192.png" alt=""><b>씨앤씨 영업 현황</b><span>불러오는 중…</span></div>
 <iframe id="app" title="씨앤씨 영업 현황" allow="clipboard-write"></iframe>
 <div id="install"><img src="icons/icon-192.png" alt=""><div id="iText"><b>앱으로 설치</b><br><span id="iHow">홈 화면에 추가하면 앱처럼 쓸 수 있어요</span></div><button id="iBtn" type="button">설치</button><button id="iX" type="button" aria-label="닫기">✕</button></div>
+<div id="inapp"><img src="icons/icon-192.png" alt=""><b>브라우저에서 열어 주세요</b>
+  <p id="inMsg">카카오톡 안에서는 앱 설치가 안 돼요.<br>아래 버튼을 누르면 브라우저로 열려요.</p>
+  <button class="big" id="inGo" type="button">브라우저로 열기</button>
+  <small id="inHow"></small>
+  <button class="sub" id="inStay" type="button">설치 없이 여기서 그냥 쓰기</button></div>
+<div id="guide"><img src="icons/icon-192.png" alt=""><b>홈 화면에 앱 추가</b>
+  <div class="steps" id="gSteps"></div>
+  <button class="big" id="gBtn" type="button" style="display:none">지금 설치하기</button>
+  <button class="sub" id="gX" type="button">나중에 할게요</button>
+  <div class="arrow" id="gArrow" style="display:none">⬇️</div></div>
 <div id="offline"><b style="font-size:20px">인터넷 연결이 없어요</b><span style="color:var(--mut)">연결된 뒤 다시 시도해 주세요</span><button type="button" onclick="location.reload()">다시 시도</button></div>
 <script>
   // ▼ Apps Script 웹 앱 주소 (배포 URL이 바뀌면 여기만 고치면 됨)
   var APP_URL = 'https://script.google.com/macros/s/AKfycbw6Qsi7ZVZktH4xutPdGWHkYaM1u2nw6HGJDN3u8mBQVk0sbqBTpPliLXGwn20O_ix8/exec';
 
   var frame = document.getElementById('app'), splash = document.getElementById('splash');
+  var UA = navigator.userAgent, ios = /iphone|ipad|ipod/i.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1), android = /android/i.test(UA);
+  var kakao = /KAKAOTALK/i.test(UA);
+  var inApp = kakao || /NAVER\(inapp|Line\/|Instagram|FBAN|FBAV|DaumApps|everytimeApp|BAND\/|; wv\)/i.test(UA);
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  var fromLink = new URLSearchParams(location.search).has('install');   // 카톡 등에서 넘어온 경우 → 설치 안내를 크게
+
   function start() {
+    if (frame.src) return;
     if (!navigator.onLine) { document.getElementById('offline').classList.add('on'); return; }
     frame.src = APP_URL;
     frame.addEventListener('load', function () { setTimeout(function () { splash.classList.add('off'); }, 300); });
     setTimeout(function () { splash.classList.add('off'); }, 12000);
   }
-  start();
   window.addEventListener('online', function () { if (!frame.src) location.reload(); });
-
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
 
-  // 설치 안내 (이미 앱으로 설치해서 열었거나, 닫은 적 있으면 안 보임)
-  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  // ① 카카오톡·네이버·인스타 등 앱 안 브라우저: 설치가 안 되므로 바깥 브라우저로 넘김
+  function target() { var u = new URL(location.href); u.searchParams.set('install', '1'); return u.toString(); }
+  function openOutside() {
+    if (kakao) {
+      location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(target());
+      setTimeout(function () { location.href = ios ? 'kakaoweb://closeBrowser' : 'kakaotalk://inappbrowser/close'; }, 1500);
+    } else if (android) {
+      var u = new URL(target());
+      location.href = 'intent://' + u.host + u.pathname + u.search + '#Intent;scheme=https;package=com.android.chrome;end';
+    }
+  }
+  if (inApp && !standalone) {
+    var ia = document.getElementById('inapp');
+    if (ios && !kakao) {   // 아이폰의 다른 앱 안: 자동으로 못 넘김 → 방법 안내
+      document.getElementById('inMsg').innerHTML = '이 앱 안에서는 설치가 안 돼요.<br>메뉴 <b>···</b> → <b>Safari로 열기</b>를 눌러 주세요.';
+      document.getElementById('inGo').style.display = 'none';
+    } else {
+      document.getElementById('inHow').textContent = kakao ? '안 넘어가면: 오른쪽 아래 ··· (또는 ⋮) → 「다른 브라우저로 열기」' : '안 넘어가면: 메뉴(⋮) → 「다른 브라우저로 열기」';
+      openOutside();
+    }
+    document.getElementById('inGo').addEventListener('click', openOutside);
+    document.getElementById('inStay').addEventListener('click', function () { ia.classList.remove('on'); start(); });
+    ia.classList.add('on'); splash.classList.add('off');
+  } else {
+    start();
+  }
+
+  // ② 설치 안내: 평소엔 아래 작은 막대, 카톡에서 넘어온 경우엔 전체 화면 안내
   var dismissed = false; try { dismissed = localStorage.getItem('installDismissed') === '1'; } catch (e) {}
   var bar = document.getElementById('install'), how = document.getElementById('iHow'), btn = document.getElementById('iBtn'), deferred = null;
-  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  if (!standalone && !dismissed) {
-    if (ios) { how.textContent = '사파리 아래 공유 버튼(□↑) → 「홈 화면에 추가」'; btn.style.display = 'none'; setTimeout(function () { bar.classList.add('on'); }, 1500); }
-    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; bar.classList.add('on'); });
-    if (!ios) setTimeout(function () { if (!deferred) { how.textContent = '브라우저 메뉴(⋮) → 「홈 화면에 추가」 또는 「앱 설치」'; btn.style.display = 'none'; bar.classList.add('on'); } }, 4000);
+  var guide = document.getElementById('guide'), gSteps = document.getElementById('gSteps'), gBtn = document.getElementById('gBtn');
+  function showGuide() {
+    if (ios) {
+      gSteps.innerHTML = /CriOS/.test(UA)
+        ? '<div>1. 주소창 오른쪽 <b>공유(□↑)</b> 버튼</div><div>2. <b>홈 화면에 추가</b></div><div>3. 오른쪽 위 <b>추가</b></div>'
+        : '<div>1. 아래 <b>공유(□↑)</b> 버튼<br><small>안 보이면 아래 <b>···</b> → 공유</small></div><div>2. 목록을 올려 <b>홈 화면에 추가</b></div><div>3. 오른쪽 위 <b>추가</b></div>';
+      document.getElementById('gArrow').style.display = /CriOS/.test(UA) ? 'none' : 'block';
+    } else if (deferred) {
+      gSteps.innerHTML = '<div>아래 버튼을 누르고 <b>설치</b>를 누르면 끝!</div>';
+      gBtn.style.display = 'block';
+    } else {
+      gSteps.innerHTML = '<div>1. 오른쪽 위 메뉴 <b>⋮</b></div><div>2. <b>앱 설치</b> 또는 <b>홈 화면에 추가</b></div><div>3. <b>설치</b> 누르기</div>';
+    }
+    bar.classList.remove('on'); guide.classList.add('on');
   }
-  btn.addEventListener('click', function () {
+  function doInstall() {
     if (!deferred) return;
     deferred.prompt();
-    deferred.userChoice.then(function () { bar.classList.remove('on'); deferred = null; });
-  });
+    deferred.userChoice.then(function () { bar.classList.remove('on'); guide.classList.remove('on'); deferred = null; });
+  }
+  if (!standalone && !inApp) {
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault(); deferred = e;
+      if (guide.classList.contains('on')) showGuide(); else if (!dismissed) bar.classList.add('on');
+    });
+    if (fromLink) setTimeout(showGuide, ios ? 600 : 1500);
+    else if (!dismissed) {
+      if (ios) { how.textContent = '사파리 아래 공유 버튼(□↑) → 「홈 화면에 추가」'; btn.style.display = 'none'; setTimeout(function () { bar.classList.add('on'); }, 1500); }
+      else setTimeout(function () { if (!deferred) { how.textContent = '브라우저 메뉴(⋮) → 「홈 화면에 추가」 또는 「앱 설치」'; btn.style.display = 'none'; bar.classList.add('on'); } }, 4000);
+    }
+  }
+  btn.addEventListener('click', doInstall);
+  gBtn.addEventListener('click', doInstall);
+  document.getElementById('gX').addEventListener('click', function () { guide.classList.remove('on'); });
   document.getElementById('iX').addEventListener('click', function () {
     bar.classList.remove('on'); try { localStorage.setItem('installDismissed', '1'); } catch (e) {}
   });
-  window.addEventListener('appinstalled', function () { bar.classList.remove('on'); });
+  window.addEventListener('appinstalled', function () { bar.classList.remove('on'); guide.classList.remove('on'); });
 </script>
 </body>
 </html>

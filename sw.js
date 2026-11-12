@@ -1,5 +1,5 @@
 // 씨앤씨 영업 현황 - 오프라인용 기본 파일 저장 (데이터는 Apps Script에서 실시간으로 불러옴)
-var CACHE = 'cnc-sales-v1';
+var CACHE = 'cnc-sales-v2';
 var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {

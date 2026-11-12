@@ -112,7 +112,7 @@
   function start() {
     if (frame.src) return;
     if (!navigator.onLine) { document.getElementById('offline').classList.add('on'); return; }
-    frame.src = APP_URL + '?shell=' + (ourApp ? 'apk' : 'web');
+    frame.src = APP_URL + '?shell=' + (ourApp ? 'apk' : standalone ? 'web' : 'site');
     frame.addEventListener('load', function () { setTimeout(function () { splash.classList.add('off'); }, 300); });
     setTimeout(function () { splash.classList.add('off'); }, 12000);
   }

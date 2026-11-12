@@ -2,6 +2,15 @@ package kr.co.candc.sales;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.SharedPreferences;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.json.JSONObject;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.webkit.JavascriptInterface;
@@ -31,6 +40,8 @@ public class MainActivity extends Activity {
 
     private static final String START_URL = "https://leekyounghyen-cmyk.github.io/cnc-sales-app/?app=android";
     private static final int FILE_REQ = 1001;
+    private static final String APK_URL = "https://leekyounghyen-cmyk.github.io/cnc-sales-app/?apk=1";
+    private static final String RELEASE_API = "https://api.github.com/repos/leekyounghyen-cmyk/cnc-sales-app/releases/tags/android";
 
     private WebView web;
     private ValueCallback<Uri[]> fileCb;
@@ -87,12 +98,49 @@ public class MainActivity extends Activity {
         // 웹 화면 ↔ 앱 연결: 로그인 정보 받아서 알림 확인 시작
         web.addJavascriptInterface(new Bridge(), "CncApp");
         NotiJob.schedule(this);
+        checkUpdate(false);
 
         // 엑셀 등 파일 받기 → 휴대폰 브라우저로 넘김
         web.setDownloadListener((url, ua, cd, mime, len) -> openOutside(Uri.parse(url)));
 
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
         else web.loadUrl(START_URL);
+    }
+
+    @Override
+    protected void onResume() { super.onResume(); checkUpdate(false); }
+
+    /** 새 앱 버전이 나왔는지 확인 (6시간에 한 번) → 있으면 업데이트 안내. 같은 서명 키라 지우지 않고 위에 덮어 설치됨 */
+    private void checkUpdate(boolean force) {
+        SharedPreferences p = NotiJob.prefs(this);
+        long now = System.currentTimeMillis();
+        if (!force && now - p.getLong("updAt", 0) < 6 * 3600 * 1000L) return;
+        p.edit().putLong("updAt", now).apply();
+        new Thread(() -> {
+            try {
+                HttpURLConnection con = (HttpURLConnection) new URL(RELEASE_API).openConnection();
+                con.setRequestProperty("Accept", "application/vnd.github+json");
+                con.setConnectTimeout(10000); con.setReadTimeout(15000);
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(con.getInputStream(), "UTF-8"))) {
+                    String line; while ((line = r.readLine()) != null) sb.append(line);
+                }
+                Matcher m = Pattern.compile("빌드 (\\d+)").matcher(new JSONObject(sb.toString()).optString("name"));
+                if (!m.find()) return;
+                int latest = Integer.parseInt(m.group(1));
+                int mine = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+                if (latest <= mine) return;
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    new AlertDialog.Builder(this)
+                            .setTitle("새 버전이 있어요")
+                            .setMessage("씨앤씨 앱을 업데이트할까요?\n받은 파일을 누르고 「업데이트」만 누르면 돼요. (로그인·알림 설정은 그대로)")
+                            .setPositiveButton("업데이트", (d, w) -> openOutside(Uri.parse(APK_URL)))
+                            .setNegativeButton("나중에", null)
+                            .show();
+                });
+            } catch (Exception ignored) { }
+        }).start();
     }
 
     /** 웹 화면(시작 페이지)에서 부르는 기능 */

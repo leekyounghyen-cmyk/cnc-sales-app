@@ -103,12 +103,25 @@
       location.href = 'intent://' + u.host + u.pathname + u.search + '#Intent;scheme=https;package=com.android.chrome;end';
     }
   }
+  // ?apk=1 링크: 카톡 등에서는 크롬으로 넘긴 뒤, 크롬에서 앱 파일(APK) 바로 받기
+  var wantApk = /[?&]apk=1/.test(location.search);
+  if (wantApk && !inApp && !ourApp) {
+    if (android) {
+      location.href = APK_URL;
+      splash.querySelector('span').innerHTML = '앱 파일을 받는 중…<br><br>위나 아래에 뜨는 <b>다운로드</b> 알림을 눌러 설치하세요.<br><small>안 받아지면 <a href="' + APK_URL + '">여기</a>를 누르세요</small>';
+    } else {
+      splash.querySelector('span').innerHTML = '앱 파일은 안드로이드 전용이에요.<br>아이폰은 <a href="./?install=1">홈 화면에 추가</a>로 설치하세요.';
+    }
+    splash.querySelector('span').style.cssText = 'text-align:center;line-height:1.6;padding:0 24px';
+    throw 0;   // 아래 앱 불러오기는 생략
+  }
   if (inApp && !standalone) {
     var ia = document.getElementById('inapp');
     if (ios && !kakao) {   // 아이폰의 다른 앱 안: 자동으로 못 넘김 → 방법 안내
       document.getElementById('inMsg').innerHTML = '이 앱 안에서는 설치가 안 돼요.<br>메뉴 <b>···</b> → <b>Safari로 열기</b>를 눌러 주세요.';
       document.getElementById('inGo').style.display = 'none';
     } else {
+      if (wantApk) document.getElementById('inMsg').innerHTML = '카카오톡 안에서는 앱 파일을 받을 수 없어요.<br>아래 버튼을 누르면 크롬에서 바로 받아져요.';
       document.getElementById('inHow').textContent = kakao ? '안 넘어가면: 오른쪽 아래 ··· (또는 ⋮) → 「다른 브라우저로 열기」' : '안 넘어가면: 메뉴(⋮) → 「다른 브라우저로 열기」';
       openOutside();
     }

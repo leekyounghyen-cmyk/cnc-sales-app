@@ -75,9 +75,11 @@
 
   var frame = document.getElementById('app'), splash = document.getElementById('splash');
   var UA = navigator.userAgent, ios = /iphone|ipad|ipod/i.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1), android = /android/i.test(UA);
+  var ourApp = /CncSalesApp/.test(UA) || /[?&]app=android/.test(location.search);   // 안드로이드 앱(설치 파일)으로 연 경우
   var kakao = /KAKAOTALK/i.test(UA);
-  var inApp = kakao || /NAVER\(inapp|Line\/|Instagram|FBAN|FBAV|DaumApps|everytimeApp|BAND\/|; wv\)/i.test(UA);
-  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  var inApp = !ourApp && (kakao || /NAVER\(inapp|Line\/|Instagram|FBAN|FBAV|DaumApps|everytimeApp|BAND\/|; wv\)/i.test(UA));
+  var standalone = ourApp || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  var APK_URL = 'https://github.com/leekyounghyen-cmyk/cnc-sales-app/releases/download/android/cnc-sales.apk';
   var fromLink = new URLSearchParams(location.search).has('install');   // 카톡 등에서 넘어온 경우 → 설치 안내를 크게
 
   function start() {
@@ -133,6 +135,7 @@
     } else {
       gSteps.innerHTML = '<div>1. 오른쪽 위 메뉴 <b>⋮</b></div><div>2. <b>앱 설치</b> 또는 <b>홈 화면에 추가</b></div><div>3. <b>설치</b> 누르기</div>';
     }
+    if (android) gSteps.innerHTML += '<div style="border-top:1px solid rgb(127 127 127/.2);margin-top:6px;padding-top:10px"><small>정식 앱으로 쓰고 싶다면 <a href="' + APK_URL + '">안드로이드 앱 파일 받기</a><br>받은 파일을 눌러 설치 (처음 한 번 「출처를 알 수 없는 앱 허용」)</small></div>';
     bar.classList.remove('on'); guide.classList.add('on');
   }
   function doInstall() {

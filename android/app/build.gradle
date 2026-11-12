@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+def vc = (System.getenv('VERSION_CODE') ?: '1') as int
+
+android {
+    namespace 'kr.co.candc.sales'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'kr.co.candc.sales'
+        minSdk 24
+        targetSdk 34
+        versionCode vc
+        versionName "1.0.${vc}"
+    }
+
+    signingConfigs {
+        release {
+            // GitHub Actions 비밀값(KEYSTORE_B64, KEYSTORE_PASS)으로 서명 — 키는 저장소에 올리지 않음
+            storeFile file(System.getenv('KS_PATH') ?: 'release.jks')
+            storePassword System.getenv('KS_PASS')
+            keyAlias 'cnc'
+            keyPassword System.getenv('KS_PASS')
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

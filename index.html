@@ -63,6 +63,19 @@
   .steps div { padding:6px 0; font-size:15px; }
   .arrow { position:fixed; bottom:calc(6px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); font-size:34px; animation:bob 1s infinite; }
   @keyframes bob { 50% { transform:translate(-50%,8px); } }
+  #pushc { position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:9; display:none; background:var(--card); color:var(--fg);
+    border-radius:18px; padding:16px; box-shadow:0 10px 32px rgb(0 0 0/.22); font-size:15px; line-height:1.5; max-width:440px; margin:0 auto; }
+  #pushc.on { display:block; animation:pcup .3s ease both; }
+  @keyframes pcup { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:none } }
+  #pushc .r { display:flex; gap:12px; align-items:center; }
+  #pushc img { width:44px; height:44px; border-radius:12px; flex:0 0 auto; box-shadow:0 0 0 1px rgb(127 127 127/.2); }
+  #pushc small { color:var(--mut); }
+  #pushc .b { display:flex; gap:8px; margin-top:12px; }
+  #pushc button { flex:1; border:0; font:inherit; font-weight:700; border-radius:12px; padding:11px; cursor:pointer; }
+  #pcOn { background:linear-gradient(90deg,#7fb33a,#0099df); color:#fff; }
+  #pcNo { background:rgb(127 127 127/.12); color:var(--fg); }
+  #ptoast { position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:10; background:rgb(25 31 40/.92); color:#fff; padding:10px 16px; border-radius:12px; font-size:14px; display:none; max-width:86%; text-align:center; }
+  #ptoast.on { display:block; }
 </style>
 </head>
 <body>
@@ -79,6 +92,9 @@
   <button class="big" id="gBtn" type="button" style="display:none">지금 설치하기</button>
   <button class="sub" id="gX" type="button">나중에 할게요</button>
   <div class="arrow" id="gArrow" style="display:none">⬇️</div></div>
+<div id="pushc"><div class="r"><img src="icons/icon-192.png" alt=""><div><b>휴대폰 알림을 켤까요?</b><br><small id="pcMsg">수리 출고가 끝나면 바로 알려 드려요</small></div></div>
+  <div class="b"><button id="pcNo" type="button">나중에</button><button id="pcOn" type="button">🔔 알림 켜기</button></div></div>
+<div id="ptoast"></div>
 <div id="offline"><b style="font-size:20px">인터넷 연결이 없어요</b><span style="color:var(--mut)">연결된 뒤 다시 시도해 주세요</span><button type="button" onclick="location.reload()">다시 시도</button></div>
 <script>
   // ▼ Apps Script 웹 앱 주소 (배포 URL이 바뀌면 여기만 고치면 됨)
@@ -96,7 +112,7 @@
   function start() {
     if (frame.src) return;
     if (!navigator.onLine) { document.getElementById('offline').classList.add('on'); return; }
-    frame.src = APP_URL;
+    frame.src = APP_URL + '?shell=' + (ourApp ? 'apk' : 'web');
     frame.addEventListener('load', function () { setTimeout(function () { splash.classList.add('off'); }, 300); });
     setTimeout(function () { splash.classList.add('off'); }, 12000);
   }
@@ -186,6 +202,69 @@
     bar.classList.remove('on'); try { localStorage.setItem('installDismissed', '1'); } catch (e) {}
   });
   window.addEventListener('appinstalled', function () { bar.classList.remove('on'); guide.classList.remove('on'); });
+
+  // ③ 휴대폰 알림(푸시) — 앱 화면(Apps Script)이 로그인 정보를 보내 주면 여기서 알림을 켬
+  var VAPID_PUB = 'BNg0ug4KUwXkYnCq-qlsYZTjf1LMtqbZpkpRAWvODwM_0nyjmywrL1KHu9_IZLMWWAYKhnlT9QMyL491gDsHKBQ';
+  var idb = (function () {
+    function open() { return new Promise(function (ok, no) { var r = indexedDB.open('cnc', 1); r.onupgradeneeded = function () { r.result.createObjectStore('kv'); }; r.onsuccess = function () { ok(r.result); }; r.onerror = no; }); }
+    return {
+      set: function (k, v) { return open().then(function (db) { return new Promise(function (ok) { var t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = ok; t.onerror = ok; }); }).catch(function () {}); },
+      get: function (k) { return open().then(function (db) { return new Promise(function (ok) { var q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = function () { ok(q.result); }; q.onerror = function () { ok(null); }; }); }).catch(function () { return null; }); }
+    };
+  })();
+  var TOKEN = '', pc = document.getElementById('pushc'), pcMsg = document.getElementById('pcMsg');
+  function ptoast(t) { var el = document.getElementById('ptoast'); el.textContent = t; el.classList.add('on'); clearTimeout(ptoast.t); ptoast.t = setTimeout(function () { el.classList.remove('on'); }, 3500); }
+  function pushOk() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function b64u(s) { var p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
+  function api(body) { return fetch(APP_URL, { method: 'POST', body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+  function subscribe(quiet) {
+    return navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription().then(function (s) { return s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUB) }); });
+    }).then(function (sub) {
+      return api({ api: 'push', token: TOKEN, sub: sub.toJSON(), ua: (ios ? 'iPhone' : android ? 'Android' : 'PC') });
+    }).then(function (r) {
+      if (r && r.ok) { try { localStorage.setItem('pushAt', String(Date.now())); } catch (e) {} if (!quiet) ptoast('알림이 켜졌어요 ✓ 출고되면 바로 알려 드릴게요'); }
+      else if (!quiet) ptoast('알림 등록에 실패했어요. 다시 시도해 주세요');
+    }).catch(function (e) { if (!quiet) ptoast('알림을 켜지 못했어요 (' + (e && e.message || e) + ')'); });
+  }
+  function showPushCard(force) {
+    if (ourApp) { try { window.CncApp && CncApp.askPermission(); } catch (e) {} return; }
+    if (!pushOk()) {
+      if (force) ptoast(ios && !standalone ? '아이폰은 홈 화면에 추가한 「씨앤씨」 앱에서만 알림을 받을 수 있어요' : '이 브라우저는 알림을 지원하지 않아요');
+      return;
+    }
+    if (Notification.permission === 'denied') { if (force) ptoast('알림이 차단돼 있어요. 휴대폰 설정 → 알림에서 「씨앤씨」를 켜 주세요'); return; }
+    if (Notification.permission === 'granted') { subscribe(!force); return; }
+    var no = false; try { no = Number(localStorage.getItem('pushNo') || 0) > Date.now() - 3 * 86400000; } catch (e) {}
+    if (!force && (no || (ios && !standalone))) return;
+    pc.classList.add('on');
+  }
+  document.getElementById('pcOn').addEventListener('click', function () {
+    pc.classList.remove('on');
+    Notification.requestPermission().then(function (p) {
+      if (p === 'granted') subscribe(false); else ptoast('알림을 허용하지 않았어요. 나중에 메뉴(⋯) → 「휴대폰 알림 켜기」로 켤 수 있어요');
+    });
+  });
+  document.getElementById('pcNo').addEventListener('click', function () { pc.classList.remove('on'); try { localStorage.setItem('pushNo', String(Date.now())); } catch (e) {} });
+  window.addEventListener('message', function (e) {
+    var host = ''; try { host = new URL(e.origin).hostname; } catch (x) {}
+    if (!/(^|[.])googleusercontent[.]com$/.test(host)) return;   // 우리 앱 화면에서 온 것만
+    var m = e.data; if (!m || !m.cnc) return;
+    if (m.t === 'token' && /^[a-f0-9]{64}$/.test(m.token || '')) {
+      var changed = m.token !== TOKEN; TOKEN = m.token; idb.set('token', TOKEN);
+      if (ourApp) { try { window.CncApp && CncApp.setToken(TOKEN); } catch (x) {} return; }
+      var last = 0; try { last = Number(localStorage.getItem('pushAt') || 0); } catch (x) {}
+      if (changed) setTimeout(function () { if (pushOk() && Notification.permission === 'granted') { if (Date.now() - last > 86400000) subscribe(true); } else showPushCard(false); }, 2500);
+    } else if (m.t === 'logout') {
+      var old = TOKEN; TOKEN = ''; idb.set('token', ''); idb.set('since', 0);
+      if (ourApp) { try { window.CncApp && CncApp.setToken(''); } catch (x) {} return; }
+      if (pushOk()) navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) {
+        if (!s) return; if (old) api({ api: 'unpush', token: old, endpoint: s.endpoint }).catch(function () {}); return s.unsubscribe();
+      }).catch(function () {});
+      try { localStorage.removeItem('pushAt'); } catch (x) {}
+    } else if (m.t === 'push') { showPushCard(true);
+    } else if (m.t === 'check') { if (ourApp) { try { window.CncApp && CncApp.checkNow(); } catch (x) {} } }
+  });
 </script>
 </body>
 </html>

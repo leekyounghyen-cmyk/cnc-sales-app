@@ -1,6 +1,10 @@
 package kr.co.candc.sales;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.webkit.JavascriptInterface;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -80,11 +84,47 @@ public class MainActivity extends Activity {
             }
         });
 
+        // 웹 화면 ↔ 앱 연결: 로그인 정보 받아서 알림 확인 시작
+        web.addJavascriptInterface(new Bridge(), "CncApp");
+        NotiJob.schedule(this);
+
         // 엑셀 등 파일 받기 → 휴대폰 브라우저로 넘김
         web.setDownloadListener((url, ua, cd, mime, len) -> openOutside(Uri.parse(url)));
 
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
         else web.loadUrl(START_URL);
+    }
+
+    /** 웹 화면(시작 페이지)에서 부르는 기능 */
+    private class Bridge {
+        @JavascriptInterface
+        public void setToken(String t) {
+            if (t == null) t = "";
+            String old = NotiJob.prefs(MainActivity.this).getString("token", "");
+            if (!t.equals(old)) NotiJob.prefs(MainActivity.this).edit().putString("token", t).putLong("since", 0).apply();
+            NotiJob.schedule(MainActivity.this);
+            if (!t.isEmpty()) { ask(false); if (!t.equals(old)) NotiJob.runNow(MainActivity.this); }
+        }
+        @JavascriptInterface
+        public void askPermission() { ask(true); }
+        @JavascriptInterface
+        public void checkNow() { NotiJob.runNow(MainActivity.this); }
+    }
+
+    private void ask(boolean tell) {
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{ Manifest.permission.POST_NOTIFICATIONS }, 9);
+            } else if (tell) {
+                Toast.makeText(this, "휴대폰 알림이 켜져 있어요 ✓", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
+        if (code == 9) Toast.makeText(this, res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED
+                ? "알림이 켜졌어요 ✓ 출고되면 알려 드릴게요" : "알림을 허용하지 않았어요. 휴대폰 설정 → 앱 → 씨앤씨 → 알림에서 켤 수 있어요", Toast.LENGTH_LONG).show();
     }
 
     /** 앱 안에서 열 주소인지, 바깥(전화·카톡·다른 사이트)으로 보낼지 */

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱을 켤 때 웹이 뜨기 전 잠깐 보이는 화면: 배경 + 가운데 씨앤씨 마크 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/bg" />
+    <item android:width="150dp" android:height="150dp" android:gravity="center">
+        <bitmap android:src="@drawable/splash_mark" android:gravity="fill" />
+    </item>
+</layer-list>

@@ -38,3 +38,8 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    // 출고 알림 즉시 받기 (Firebase 클라우드 메시징, 무료)
+    implementation 'com.google.firebase:firebase-messaging:24.0.3'
+}

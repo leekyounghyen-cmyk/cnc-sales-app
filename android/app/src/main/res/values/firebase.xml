@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Firebase 프로젝트 cnc-sales-app 설정 (google-services.json 과 같은 값 · 앱 안에 들어가는 공개 식별값) -->
+<resources>
+    <string name="google_app_id" translatable="false">1:985782125301:android:33deef53d3f9d1a255fbbc</string>
+    <string name="gcm_defaultSenderId" translatable="false">985782125301</string>
+    <string name="google_api_key" translatable="false">AIzaSyAKmlcmVvjqi5ktNmUVb01pYnAgaGWiywc</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyAKmlcmVvjqi5ktNmUVb01pYnAgaGWiywc</string>
+    <string name="project_id" translatable="false">cnc-sales-app</string>
+    <string name="google_storage_bucket" translatable="false">cnc-sales-app.firebasestorage.app</string>
+</resources>

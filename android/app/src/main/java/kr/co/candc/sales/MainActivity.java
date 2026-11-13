@@ -149,8 +149,12 @@ public class MainActivity extends Activity {
         public void setToken(String t) {
             if (t == null) t = "";
             String old = NotiJob.prefs(MainActivity.this).getString("token", "");
-            if (!t.equals(old)) NotiJob.prefs(MainActivity.this).edit().putString("token", t).putLong("since", 0).apply();
+            if (!t.equals(old)) {
+                if (t.isEmpty()) NotiJob.unregFcm(MainActivity.this);   // 로그아웃 → 즉시 알림 해제
+                NotiJob.prefs(MainActivity.this).edit().putString("token", t).putLong("since", 0).apply();
+            }
             NotiJob.schedule(MainActivity.this);
+            if (!t.isEmpty()) NotiJob.regFcm(MainActivity.this);   // 출고 알림 즉시 받기 등록
             if (!t.isEmpty()) { ask(false); if (!t.equals(old)) NotiJob.runNow(MainActivity.this); }
         }
         @JavascriptInterface

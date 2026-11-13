@@ -103,6 +103,47 @@ public class NotiJob extends JobService {
         p.edit().putLong("since", last).apply();
     }
 
+    /** Firebase 즉시 알림 등록: 이 휴대폰의 Firebase 주소를 로그인한 계정에 연결 (로그아웃하면 해제) */
+    static void regFcm(Context c) {
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
+                    .addOnSuccessListener(t -> regFcm(c, t));
+        } catch (Exception ignored) { }
+    }
+    static void regFcm(Context c, String fcm) {
+        if (fcm == null || fcm.isEmpty()) return;
+        new Thread(() -> {
+            try {
+                SharedPreferences p = prefs(c);
+                String token = p.getString("token", "");
+                if (token.isEmpty()) return;
+                String r = get(APP_URL + "?api=fcm&token=" + URLEncoder.encode(token, "UTF-8") + "&fcm=" + URLEncoder.encode(fcm, "UTF-8"));
+                if (r.contains("\"ok\"")) p.edit().putString("fcmTok", fcm).putString("fcmFor", token).apply();
+            } catch (Exception ignored) { }
+        }).start();
+    }
+    /** 로그아웃: 이 휴대폰을 이전 계정의 즉시 알림에서 뺌 */
+    static void unregFcm(Context c) {
+        SharedPreferences p = prefs(c);
+        final String old = p.getString("fcmTok", ""), oldFor = p.getString("fcmFor", "");
+        p.edit().remove("fcmTok").remove("fcmFor").apply();
+        if (old.isEmpty() || oldFor.isEmpty()) return;
+        new Thread(() -> {
+            try { get(APP_URL + "?api=unfcm&token=" + URLEncoder.encode(oldFor, "UTF-8") + "&fcm=" + URLEncoder.encode(old, "UTF-8")); } catch (Exception ignored) { }
+        }).start();
+    }
+    static String get(String url) throws Exception {
+        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+        con.setInstanceFollowRedirects(true);
+        con.setConnectTimeout(15000);
+        con.setReadTimeout(20000);
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(con.getInputStream(), "UTF-8"))) {
+            String line; while ((line = r.readLine()) != null) sb.append(line);
+        }
+        return sb.toString();
+    }
+
     static void show(Context c, int id, String title, String body) {
         NotificationManager nm = (NotificationManager) c.getSystemService(NOTIFICATION_SERVICE);
         if (nm == null) return;

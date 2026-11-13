@@ -1,5 +1,5 @@
 // 씨앤씨 영업 현황 - 오프라인용 기본 파일 저장 (데이터는 Apps Script에서 실시간으로 불러옴)
-var CACHE = 'cnc-sales-v4';
+var CACHE = 'cnc-sales-v5';
 var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/mark.png', 'icons/favicon.png'];
 
 self.addEventListener('install', function (e) {
@@ -47,7 +47,7 @@ self.addEventListener('push', function (e) {
         } else if (j && j.test) { title = '씨앤씨 알림 테스트'; body = '휴대폰 알림이 잘 와요 ✓'; tag = 'test'; }
       }
     } catch (err) {}
-    return self.registration.showNotification(title, { body: body, tag: tag, renotify: true, icon: 'icons/icon-192.png', badge: 'icons/badge.png', data: { url: './' } });
+    return self.registration.showNotification(title, { body: body, tag: tag, renotify: true, silent: false, vibrate: [300, 150, 300, 150, 500], timestamp: Date.now(), icon: 'icons/icon-192.png', badge: 'icons/badge.png', data: { url: './' } });
   })());
 });
 self.addEventListener('notificationclick', function (e) {

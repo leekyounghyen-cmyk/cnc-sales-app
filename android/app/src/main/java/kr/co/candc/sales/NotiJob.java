@@ -24,14 +24,14 @@ import java.net.URL;
 import java.net.URLEncoder;
 
 /**
- * 안드로이드 앱 알림: 15분마다(그리고 로그인·테스트 때 바로) 앱 서버에 새 알림이 있는지 물어보고 휴대폰 알림을 띄움.
+ * 안드로이드 앱 알림: 5분마다(NotiAlarm) + 15분마다(백업) + 로그인·테스트 때 바로 앱 서버에 새 알림이 있는지 물어보고 휴대폰 알림을 띄움.
  * (안드로이드 앱은 웹 푸시를 못 받아서 이 방식 사용 — 구글 계정·추가 서비스 없이 동작)
  */
 public class NotiJob extends JobService {
 
     static final String APP_URL = "https://script.google.com/macros/s/AKfycbw6Qsi7ZVZktH4xutPdGWHkYaM1u2nw6HGJDN3u8mBQVk0sbqBTpPliLXGwn20O_ix8/exec";
     static final String PREFS = "cnc";
-    static final String CH = "noti";
+    static final String CH = "noti2";   // 진동을 확실히 켠 새 알림 채널 (예전 채널 "noti" 는 지움)
     static final int JOB_ID = 7001, JOB_NOW = 7002;
 
     static SharedPreferences prefs(Context c) { return c.getSharedPreferences(PREFS, MODE_PRIVATE); }
@@ -40,7 +40,8 @@ public class NotiJob extends JobService {
     static void schedule(Context c) {
         JobScheduler js = (JobScheduler) c.getSystemService(JOB_SCHEDULER_SERVICE);
         if (js == null) return;
-        if (prefs(c).getString("token", "").isEmpty()) { js.cancel(JOB_ID); return; }
+        if (prefs(c).getString("token", "").isEmpty()) { js.cancel(JOB_ID); NotiAlarm.cancel(c); return; }
+        NotiAlarm.next(c);   // 5분마다 확인 (빠른 알림)
         for (JobInfo j : js.getAllPendingJobs()) if (j.getId() == JOB_ID) return;   // 이미 예약됨
         js.schedule(new JobInfo.Builder(JOB_ID, new ComponentName(c, NotiJob.class))
                 .setPeriodic(15 * 60 * 1000L)
@@ -108,7 +109,13 @@ public class NotiJob extends JobService {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel ch = new NotificationChannel(CH, "출고·업무 알림", NotificationManager.IMPORTANCE_HIGH);
             ch.setDescription("수리 출고 완료 등 씨앤씨 업무 알림");
+            ch.enableVibration(true);
+            ch.setVibrationPattern(new long[]{ 0, 300, 150, 300, 150, 500 });
+            ch.enableLights(true);
+            ch.setLightColor(0xFF0099DF);
+            ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             nm.createNotificationChannel(ch);
+            try { nm.deleteNotificationChannel("noti"); } catch (Exception ignored) { }
         }
         Intent open = new Intent(c, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
@@ -119,8 +126,11 @@ public class NotiJob extends JobService {
                 .setContentText(body)
                 .setStyle(new Notification.BigTextStyle().bigText(body))
                 .setAutoCancel(true)
+                .setWhen(System.currentTimeMillis())
+                .setShowWhen(true)
+                .setCategory(Notification.CATEGORY_MESSAGE)
                 .setContentIntent(pi);
-        if (Build.VERSION.SDK_INT < 26) b.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+        if (Build.VERSION.SDK_INT < 26) b.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL).setVibrate(new long[]{ 0, 300, 150, 300, 150, 500 });
         try { nm.notify(id, b.build()); } catch (SecurityException ignored) { }
     }
 }

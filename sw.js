@@ -38,12 +38,12 @@ self.addEventListener('push', function (e) {
       if (token) {
         var r = await fetch(APP_URL + '?api=noti&token=' + encodeURIComponent(token) + '&since=' + since);
         var j = await r.json();
+        if (j && j.last) await idbSet('since', j.last);   // 알림 설정에서 끈 종류도 건너뛰게 (2026-11-13)
         if (j && j.items && j.items.length) {
           var x = j.items[0];
           title = (x.kind || '알림') + (x.co ? ' · ' + x.co : '');
           body = (x.text || '') + (j.items.length > 1 ? '  (외 ' + (j.items.length - 1) + '건)' : '');
           tag = 'noti-' + x.id;
-          if (j.last) await idbSet('since', j.last);
         } else if (j && j.test) { title = '씨앤씨 알림 테스트'; body = '휴대폰 알림이 잘 와요 ✓'; tag = 'test'; }
       }
     } catch (err) {}

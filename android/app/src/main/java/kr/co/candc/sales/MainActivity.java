@@ -30,6 +30,12 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.provider.Settings;
+import java.io.File;
 
 /**
  * 씨앤씨 영업 현황 — 안드로이드 앱
@@ -42,6 +48,10 @@ public class MainActivity extends Activity {
     private static final int FILE_REQ = 1001;
     private static final String APK_URL = "https://leekyounghyen-cmyk.github.io/cnc-sales-app/?apk=1";
     private static final String RELEASE_API = "https://api.github.com/repos/leekyounghyen-cmyk/cnc-sales-app/releases/tags/android";
+    static final String APK_DIRECT = "https://github.com/leekyounghyen-cmyk/cnc-sales-app/releases/download/android/cnc-sales.apk";
+    private boolean wantInstallPerm = false;
+    private long dlId = -1;
+    private BroadcastReceiver dlDone;
 
     private WebView web;
     private ValueCallback<Uri[]> fileCb;
@@ -105,10 +115,88 @@ public class MainActivity extends Activity {
 
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
         else web.loadUrl(START_URL);
+        if (getIntent() != null && getIntent().getBooleanExtra("update", false)) startUpdate();   // 「새 버전」 알림을 눌러서 열었을 때
     }
 
     @Override
-    protected void onResume() { super.onResume(); checkUpdate(false); }
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        if (i != null && i.getBooleanExtra("update", false)) startUpdate();
+    }
+
+    // ───── 앱 안에서 바로 업데이트: 새 APK 받기 → 설치 화면 (「업데이트」만 누르면 끝) ─────
+    void startUpdate() {
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                wantInstallPerm = true;
+                new AlertDialog.Builder(this)
+                        .setTitle("처음 한 번만 허용해 주세요")
+                        .setMessage("앱 업데이트를 설치하려면 「이 출처 허용」을 켜야 해요.\n다음 화면에서 켜고 ← 뒤로 오면 바로 업데이트를 받아요.")
+                        .setPositiveButton("허용하러 가기", (d, w) -> {
+                            try { startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()))); }
+                            catch (Exception e) { wantInstallPerm = false; openOutside(Uri.parse(APK_URL)); }
+                        })
+                        .setNegativeButton("나중에", (d, w) -> wantInstallPerm = false)
+                        .show();
+                return;
+            }
+            download();
+        });
+    }
+
+    private void download() {
+        try {
+            File dir = getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS);
+            File f = new File(dir, "cnc-sales.apk");
+            if (f.exists()) f.delete();
+            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            DownloadManager.Request r = new DownloadManager.Request(Uri.parse(APK_DIRECT))
+                    .setTitle("씨앤씨 앱 업데이트")
+                    .setDescription("새 버전을 받는 중…")
+                    .setMimeType("application/vnd.android.package-archive")
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                    .setDestinationUri(Uri.fromFile(f));
+            if (dlDone == null) {
+                dlDone = new BroadcastReceiver() {
+                    @Override public void onReceive(Context c, Intent i) {
+                        if (i.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -2) != dlId) return;
+                        install(f);
+                    }
+                };
+                IntentFilter ff = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+                if (Build.VERSION.SDK_INT >= 33) registerReceiver(dlDone, ff, Context.RECEIVER_EXPORTED); else registerReceiver(dlDone, ff);
+            }
+            dlId = dm.enqueue(r);
+            Toast.makeText(this, "새 버전을 받는 중이에요… 잠시 후 「업데이트」를 눌러 주세요", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            openOutside(Uri.parse(APK_URL));   // 안 되면 예전 방식(브라우저로 받기)
+        }
+    }
+
+    private void install(File f) {
+        try {
+            if (!f.exists() || f.length() < 100000) { Toast.makeText(this, "받기에 실패했어요. 다시 눌러 주세요", Toast.LENGTH_LONG).show(); return; }
+            Uri u = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".files", f);
+            Intent i = new Intent(Intent.ACTION_VIEW).setDataAndType(u, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception e) {
+            openOutside(Uri.parse(APK_URL));
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (dlDone != null) { try { unregisterReceiver(dlDone); } catch (Exception ignored) { } dlDone = null; }
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (wantInstallPerm && (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls())) { wantInstallPerm = false; download(); return; }
+        checkUpdate(false);
+    }
 
     /** 새 앱 버전이 나왔는지 확인 (6시간에 한 번) → 있으면 업데이트 안내. 같은 서명 키라 지우지 않고 위에 덮어 설치됨 */
     private void checkUpdate(boolean force) {
@@ -134,8 +222,8 @@ public class MainActivity extends Activity {
                     if (isFinishing()) return;
                     new AlertDialog.Builder(this)
                             .setTitle("새 버전이 있어요")
-                            .setMessage("씨앤씨 앱을 업데이트할까요?\n받은 파일을 누르고 「업데이트」만 누르면 돼요. (로그인·알림 설정은 그대로)")
-                            .setPositiveButton("업데이트", (d, w) -> openOutside(Uri.parse(APK_URL)))
+                            .setMessage("씨앤씨 앱을 업데이트할까요?\n「업데이트」를 누르면 새 버전을 받아서 설치 화면이 떠요. (로그인·알림 설정은 그대로)")
+                            .setPositiveButton("업데이트", (d, w) -> startUpdate())
                             .setNegativeButton("나중에", null)
                             .show();
                 });
@@ -161,6 +249,10 @@ public class MainActivity extends Activity {
         public void askPermission() { ask(true); }
         @JavascriptInterface
         public void checkNow() { NotiJob.runNow(MainActivity.this); }
+        @JavascriptInterface
+        public int version() { try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode; } catch (Exception e) { return 0; } }
+        @JavascriptInterface
+        public void update() { startUpdate(); }
     }
 
     private void ask(boolean tell) {

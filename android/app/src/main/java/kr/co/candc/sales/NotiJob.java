@@ -72,7 +72,40 @@ public class NotiJob extends JobService {
     @Override
     public boolean onStopJob(JobParameters params) { return true; }
 
+    /** 새 앱 버전이 나왔으면 휴대폰 알림 (6시간에 한 번 확인, 같은 빌드는 한 번만 알림) → 누르면 앱이 바로 업데이트 받음 */
+    static void checkAppUpdate(Context c) {
+        SharedPreferences p = prefs(c);
+        long now = System.currentTimeMillis();
+        if (now - p.getLong("updBgAt", 0) < 6 * 3600 * 1000L) return;
+        p.edit().putLong("updBgAt", now).apply();
+        try {
+            String js = get("https://api.github.com/repos/leekyounghyen-cmyk/cnc-sales-app/releases/tags/android");
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("빌드 (\\d+)").matcher(new JSONObject(js).optString("name"));
+            if (!m.find()) return;
+            int latest = Integer.parseInt(m.group(1));
+            int mine = c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionCode;
+            if (latest <= mine || p.getInt("updNoti", 0) >= latest) return;
+            p.edit().putInt("updNoti", latest).apply();
+            showUpdate(c, latest);
+        } catch (Exception ignored) { }
+    }
+    static void showUpdate(Context c, int build) {
+        NotificationManager nm = (NotificationManager) c.getSystemService(NOTIFICATION_SERVICE);
+        if (nm == null) return;
+        ensureChannel(nm);
+        Intent open = new Intent(c, MainActivity.class).putExtra("update", true).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pi = PendingIntent.getActivity(c, 2, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(c, CH) : new Notification.Builder(c);
+        b.setSmallIcon(R.drawable.ic_stat).setColor(0xFF0099DF)
+                .setContentTitle("씨앤씨 앱 새 버전 (빌드 " + build + ")")
+                .setContentText("눌러서 업데이트하세요 · 로그인·알림 설정은 그대로예요")
+                .setAutoCancel(true).setContentIntent(pi);
+        if (Build.VERSION.SDK_INT < 26) b.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+        try { nm.notify(9001, b.build()); } catch (SecurityException ignored) { }
+    }
+
     static void check(Context c) throws Exception {
+        checkAppUpdate(c);
         SharedPreferences p = prefs(c);
         String token = p.getString("token", "");
         if (token.isEmpty()) return;
@@ -144,20 +177,23 @@ public class NotiJob extends JobService {
         return sb.toString();
     }
 
+    static void ensureChannel(NotificationManager nm) {
+        if (Build.VERSION.SDK_INT < 26) return;
+        NotificationChannel ch = new NotificationChannel(CH, "출고·업무 알림", NotificationManager.IMPORTANCE_HIGH);
+        ch.setDescription("수리 출고 완료 등 씨앤씨 업무 알림");
+        ch.enableVibration(true);
+        ch.setVibrationPattern(new long[]{ 0, 300, 150, 300, 150, 500 });
+        ch.enableLights(true);
+        ch.setLightColor(0xFF0099DF);
+        ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        nm.createNotificationChannel(ch);
+        try { nm.deleteNotificationChannel("noti"); } catch (Exception ignored) { }
+    }
+
     static void show(Context c, int id, String title, String body) {
         NotificationManager nm = (NotificationManager) c.getSystemService(NOTIFICATION_SERVICE);
         if (nm == null) return;
-        if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel ch = new NotificationChannel(CH, "출고·업무 알림", NotificationManager.IMPORTANCE_HIGH);
-            ch.setDescription("수리 출고 완료 등 씨앤씨 업무 알림");
-            ch.enableVibration(true);
-            ch.setVibrationPattern(new long[]{ 0, 300, 150, 300, 150, 500 });
-            ch.enableLights(true);
-            ch.setLightColor(0xFF0099DF);
-            ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            nm.createNotificationChannel(ch);
-            try { nm.deleteNotificationChannel("noti"); } catch (Exception ignored) { }
-        }
+        ensureChannel(nm);
         Intent open = new Intent(c, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(c, CH) : new Notification.Builder(c);

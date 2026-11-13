@@ -76,6 +76,13 @@
   #pcNo { background:rgb(127 127 127/.12); color:var(--fg); }
   #ptoast { position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:10; background:rgb(25 31 40/.92); color:#fff; padding:10px 16px; border-radius:12px; font-size:14px; display:none; max-width:86%; text-align:center; }
   #ptoast.on { display:block; }
+  /* 안드로이드 앱 새 버전 안내 */
+  #updBar { position:fixed; left:12px; right:12px; bottom:calc(14px + env(safe-area-inset-bottom)); z-index:50; display:none; align-items:center; gap:10px;
+    background:#141a23; color:#fff; border-radius:16px; padding:12px 14px; box-shadow:0 8px 24px rgba(0,0,0,.25); font-size:14px; }
+  #updBar.on { display:flex; }
+  #updBar span { flex:1; line-height:1.4; }
+  #updBar button { border:0; border-radius:10px; padding:9px 14px; font-weight:800; font-size:14px; background:#0099df; color:#fff; white-space:nowrap; }
+  #updBar .x { background:transparent; color:#aab; padding:6px; font-weight:600; }
 </style>
 </head>
 <body>
@@ -265,6 +272,27 @@
     } else if (m.t === 'push') { showPushCard(true);
     } else if (m.t === 'check') { if (ourApp) { try { window.CncApp && CncApp.checkNow(); } catch (x) {} } }
   });
+
+  // ───── 안드로이드 앱: 새 버전이 나왔으면 아래쪽에 「업데이트」 버튼 (빌드 7부터는 앱이 바로 받아서 설치 화면, 그 전 빌드는 받기 → 설치) ─────
+  (function () {
+    if (!ourApp) return;
+    var mv = UA.match(/CncSalesApp\/[0-9]+\.[0-9]+\.([0-9]+)/), mine = mv ? +mv[1] : 0;
+    try { if (window.CncApp && CncApp.version) mine = CncApp.version() || mine; } catch (e) {}
+    fetch('https://api.github.com/repos/leekyounghyen-cmyk/cnc-sales-app/releases/tags/android').then(function (r) { return r.json(); }).then(function (j) {
+      var m = String((j && j.name) || '').match(/빌드 ([0-9]+)/), latest = m ? +m[1] : 0;
+      if (!latest || latest <= mine) return;
+      try { if (sessionStorage.getItem('updX') === String(latest)) return; } catch (e) {}
+      var b = document.createElement('div'); b.id = 'updBar';
+      b.innerHTML = '<span>📲 <b>씨앤씨 앱 새 버전</b>이 나왔어요<br><small style="opacity:.75">빌드 ' + latest + ' · 로그인·알림 설정은 그대로</small></span><button type="button" id="updGo">업데이트</button><button type="button" class="x" id="updX">✕</button>';
+      document.body.appendChild(b); setTimeout(function () { b.classList.add('on'); }, 600);
+      document.getElementById('updGo').onclick = function () {
+        try { if (window.CncApp && CncApp.update) { CncApp.update(); b.classList.remove('on'); return; } } catch (e) {}
+        location.href = APK_URL;   // 예전 앱: 휴대폰이 파일을 받음 → 받은 파일 눌러 「업데이트」
+        this.textContent = '받는 중…';
+      };
+      document.getElementById('updX').onclick = function () { b.classList.remove('on'); try { sessionStorage.setItem('updX', String(latest)); } catch (e) {} };
+    }).catch(function () {});
+  })();
 </script>
 </body>
 </html>

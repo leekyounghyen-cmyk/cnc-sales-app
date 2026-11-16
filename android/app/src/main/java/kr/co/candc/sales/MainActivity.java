@@ -93,7 +93,7 @@ public class MainActivity extends Activity {
         });
 
         web.setWebChromeClient(new WebChromeClient() {
-            // 사진·파일 첨부: 「촬영」 칸(capture)은 카메라가 바로 켜짐 → 카메라에서 뒤로 가면 앨범에서 고르기 (빌드 8)
+            // 사진·파일 첨부: 「촬영」 칸(capture)은 카메라가 바로 켜짐 — 사진은 앱 안 카메라(앨범 버튼), 영상은 뒤로 가면 앨범 (빌드 9)
             @Override
             public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams p) {
                 if (fileCb != null) fileCb.onReceiveValue(null);
@@ -271,6 +271,10 @@ public class MainActivity extends Activity {
 
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
+        if (code == 11) {
+            if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) videoCam(); else album();
+            return;
+        }
         if (code == 9) Toast.makeText(this, res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED
                 ? "알림이 켜졌어요 ✓ 출고되면 알려 드릴게요" : "알림을 허용하지 않았어요. 휴대폰 설정 → 앱 → 씨앤씨 → 알림에서 켤 수 있어요", Toast.LENGTH_LONG).show();
     }
@@ -308,7 +312,8 @@ public class MainActivity extends Activity {
         }
     }
 
-    // 카메라 바로 켜기 (사진 또는 영상). 찍은 파일은 앱 전용 폴더 Pictures/ 에 저장 → 웹에 넘김
+    // 카메라 바로 켜기 (빌드 9): 사진 = 앱 안 카메라(CamActivity, 앨범 버튼 포함) / 영상 = 휴대폰 카메라 앱
+    private boolean camIsPhoto = false;
     private boolean openCamera(WebChromeClient.FileChooserParams p) {
         try {
             boolean video = false;
@@ -317,15 +322,40 @@ public class MainActivity extends Activity {
             if (!dir.exists()) dir.mkdirs();
             File f = new File(dir, (video ? "v" : "p") + System.currentTimeMillis() + (video ? ".mp4" : ".jpg"));
             camUri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".files", f);
-            Intent i = new Intent(video ? android.provider.MediaStore.ACTION_VIDEO_CAPTURE : android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-            i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, camUri);
-            i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivityForResult(i, CAM_REQ);
+            camIsPhoto = !video;
+            if (!video) {
+                Intent c = new Intent(this, CamActivity.class);
+                c.putExtra("out", f.getAbsolutePath());
+                startActivityForResult(c, CAM_REQ);
+                return true;
+            }
+            // 영상: 카메라 권한이 먼저 있어야 휴대폰 카메라 앱을 열 수 있음
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{ Manifest.permission.CAMERA }, 11);
+                return true;
+            }
+            videoCam();
             return true;
         } catch (Exception e) {
             camUri = null;
             return false;
         }
+    }
+
+    private void videoCam() {
+        try {
+            Intent i = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
+            i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, camUri);
+            i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(i, CAM_REQ);
+        } catch (Exception e) { album(); }
+    }
+
+    private void album() {
+        camUri = null;
+        if (fileCb == null) return;
+        try { startActivityForResult(camP.createIntent(), FILE_REQ); }
+        catch (Exception e) { fileCb.onReceiveValue(null); fileCb = null; }
     }
 
     @Override
@@ -334,12 +364,14 @@ public class MainActivity extends Activity {
             if (resultCode == RESULT_OK && camUri != null) {
                 fileCb.onReceiveValue(new Uri[]{ camUri });
                 fileCb = null;
+                camUri = null;
+            } else if (camIsPhoto && resultCode != CamActivity.RES_ALBUM) {
+                // 앱 카메라에서 ✕ 닫기 → 취소
+                fileCb.onReceiveValue(null); fileCb = null; camUri = null;
             } else {
-                // 카메라에서 뒤로 → 앨범에서 고르기
-                try { startActivityForResult(camP.createIntent(), FILE_REQ); }
-                catch (Exception e) { fileCb.onReceiveValue(null); fileCb = null; }
+                // 앨범 버튼 / 영상 카메라에서 뒤로 → 앨범에서 고르기
+                album();
             }
-            camUri = null;
             return;
         }
         if (requestCode == FILE_REQ && fileCb != null) {

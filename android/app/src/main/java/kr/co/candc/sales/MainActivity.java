@@ -55,6 +55,9 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private ValueCallback<Uri[]> fileCb;
+    private static final int CAM_REQ = 1003;
+    private Uri camUri;
+    private WebChromeClient.FileChooserParams camP;
     private long lastBack = 0;
 
     @Override
@@ -90,11 +93,12 @@ public class MainActivity extends Activity {
         });
 
         web.setWebChromeClient(new WebChromeClient() {
-            // 사진·파일 첨부
+            // 사진·파일 첨부: 「촬영」 칸(capture)은 카메라가 바로 켜짐 → 카메라에서 뒤로 가면 앨범에서 고르기 (빌드 8)
             @Override
             public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams p) {
                 if (fileCb != null) fileCb.onReceiveValue(null);
-                fileCb = cb;
+                fileCb = cb; camP = p;
+                if (p.isCaptureEnabled() && openCamera(p)) return true;
                 try {
                     startActivityForResult(p.createIntent(), FILE_REQ);
                 } catch (ActivityNotFoundException e) {
@@ -304,8 +308,40 @@ public class MainActivity extends Activity {
         }
     }
 
+    // 카메라 바로 켜기 (사진 또는 영상). 찍은 파일은 앱 전용 폴더 Pictures/ 에 저장 → 웹에 넘김
+    private boolean openCamera(WebChromeClient.FileChooserParams p) {
+        try {
+            boolean video = false;
+            for (String t : p.getAcceptTypes()) if (t != null && t.startsWith("video")) video = true;
+            File dir = new File(getExternalFilesDir(null), "Pictures");
+            if (!dir.exists()) dir.mkdirs();
+            File f = new File(dir, (video ? "v" : "p") + System.currentTimeMillis() + (video ? ".mp4" : ".jpg"));
+            camUri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".files", f);
+            Intent i = new Intent(video ? android.provider.MediaStore.ACTION_VIDEO_CAPTURE : android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+            i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, camUri);
+            i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(i, CAM_REQ);
+            return true;
+        } catch (Exception e) {
+            camUri = null;
+            return false;
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == CAM_REQ && fileCb != null) {
+            if (resultCode == RESULT_OK && camUri != null) {
+                fileCb.onReceiveValue(new Uri[]{ camUri });
+                fileCb = null;
+            } else {
+                // 카메라에서 뒤로 → 앨범에서 고르기
+                try { startActivityForResult(camP.createIntent(), FILE_REQ); }
+                catch (Exception e) { fileCb.onReceiveValue(null); fileCb = null; }
+            }
+            camUri = null;
+            return;
+        }
         if (requestCode == FILE_REQ && fileCb != null) {
             fileCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
             fileCb = null;

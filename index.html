@@ -259,16 +259,23 @@
     var m = e.data; if (!m || !m.cnc) return;
     if (m.t === 'token' && /^[a-f0-9]{64}$/.test(m.token || '')) {
       var changed = m.token !== TOKEN; TOKEN = m.token; idb.set('token', TOKEN);
+      if (typeof m.me === 'string' && m.me.length < 4000) idb.set('me', m.me);   // 아이폰에서 앱 화면 저장소가 지워져도 자동 로그인 복구용
       if (ourApp) { try { window.CncApp && CncApp.setToken(TOKEN); } catch (x) {} return; }
       var last = 0; try { last = Number(localStorage.getItem('pushAt') || 0); } catch (x) {}
       if (changed) setTimeout(function () { if (pushOk() && Notification.permission === 'granted') { if (Date.now() - last > 86400000) subscribe(true); } else showPushCard(false); }, 2500);
     } else if (m.t === 'logout') {
-      var old = TOKEN; TOKEN = ''; idb.set('token', ''); idb.set('since', 0);
+      var old = TOKEN; TOKEN = ''; idb.set('token', ''); idb.set('me', ''); idb.set('since', 0);
       if (ourApp) { try { window.CncApp && CncApp.setToken(''); } catch (x) {} return; }
       if (pushOk()) navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) {
         if (!s) return; if (old) api({ api: 'unpush', token: old, endpoint: s.endpoint }).catch(function () {}); return s.unsubscribe();
       }).catch(function () {});
       try { localStorage.removeItem('pushAt'); } catch (x) {}
+    } else if (m.t === 'need') {   // 앱 화면에 로그인 정보가 없어졌을 때(아이폰 등) → 보관해 둔 로그인으로 자동 로그인
+      var src = e.source, org = e.origin;
+      Promise.all([idb.get('token'), idb.get('me')]).then(function (v) {
+        if (!v[0] || !v[1] || !src) return;
+        try { src.postMessage({ cnc: 1, t: 'restore', token: v[0], me: v[1] }, org); } catch (x) {}
+      });
     } else if (m.t === 'push') { showPushCard(true);
     } else if (m.t === 'check') { if (ourApp) { try { window.CncApp && CncApp.checkNow(); } catch (x) {} } }
   });

@@ -351,6 +351,18 @@ public class MainActivity extends Activity {
         } catch (Exception e) { album(); }
     }
 
+    // 앨범에서 고른 사진 받기 (빌드 10): 여러 장 고르기 칸은 갤러리가 목록(ClipData)으로 돌려줘서 기본 처리로는 비어 버림 → 직접 꺼냄
+    private Uri[] picked(int resultCode, Intent data) {
+        if (resultCode != RESULT_OK || data == null) return null;
+        java.util.ArrayList<Uri> l = new java.util.ArrayList<>();
+        android.content.ClipData cd = data.getClipData();
+        if (cd != null) for (int i = 0; i < cd.getItemCount(); i++) { Uri u = cd.getItemAt(i).getUri(); if (u != null) l.add(u); }
+        if (l.isEmpty() && data.getData() != null) l.add(data.getData());
+        if (l.isEmpty()) return null;
+        if (camP != null && camP.getMode() != WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE && l.size() > 1) return new Uri[]{ l.get(0) };
+        return l.toArray(new Uri[0]);
+    }
+
     private void album() {
         camUri = null;
         if (fileCb == null) return;
@@ -375,7 +387,7 @@ public class MainActivity extends Activity {
             return;
         }
         if (requestCode == FILE_REQ && fileCb != null) {
-            fileCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+            fileCb.onReceiveValue(picked(resultCode, data));
             fileCb = null;
             return;
         }

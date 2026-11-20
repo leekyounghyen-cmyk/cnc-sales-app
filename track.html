@@ -139,6 +139,7 @@
     h += '<div class="msg">' + esc(it.msg) + '</div>';
     if (done && it.dOut) h += '<div class="eta"><b>' + md(it.dOut, true) + '</b> 출고</div>';
     else if (it.plan) h += '<div class="eta">출고 예정 <b>' + md(it.plan, true) + '</b></div>';
+    else if (it.sg < 3) h += '<div class="eta">' + (it.qok ? '출고 예정일을 곧 안내드릴게요' : '견적을 확정해 주시면 출고 예정일을 안내드려요') + '</div>';
     // 예정보다 빨리: 출고 예정일보다 일찍 출고 / 예정일 전에 수리 끝남
     if (done && it.dOut && it.plan) {
       var ed = dd(it.dOut, it.plan);
@@ -157,8 +158,8 @@
     });
     h += '</div>';
     // 날짜
-    var dc = function (lab, d) { return '<div' + (d ? '' : ' class="no"') + '><em>' + lab + '</em><b>' + (d ? md(d, true) : '미정') + '</b></div>'; };
-    h += '<div class="dates">' + dc('맡긴 날', it.dIn) + dc('출고 예정', done ? (it.plan || it.dOut) : it.plan) + dc('출고일', it.dOut) + '</div>';
+    var dc = function (lab, d, none) { return '<div' + (d ? '' : ' class="no"') + '><em>' + lab + '</em><b>' + (d ? md(d, true) : (none || '미정')) + '</b></div>'; };
+    h += '<div class="dates">' + dc('맡긴 날', it.dIn) + dc('출고 예정', done ? (it.plan || it.dOut) : it.plan, !done && !it.qok && it.sg < 3 ? '견적 확정 후' : '') + dc('출고일', it.dOut) + '</div>';
     // 견적 금액
     if (it.price != null || it.free) h += '<div class="row"><em>견적 금액</em><b>' + (it.free ? '무상 수리' : won(it.price) + ' <small>VAT 별도</small>') + '</b></div>';
     if (it.sym) h += '<div class="note"><em>입고 증상</em>' + esc(it.sym) + '</div>';
@@ -220,8 +221,8 @@
   function demoData() {
     var t = new Date(), f = function (n) { var x = new Date(t.getTime() + n * 864e5); return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2); };
     return { co: '(예시) 한빛물류', at: (t.getMonth() + 1) + '월 ' + t.getDate() + '일 ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2), rep: [{ n: '홍길동', p: '01012345678' }], items: [
-      { team: '라벨프린터', no: '474', name: 'ZEBRA 라벨프린터 ZT410', sn: '…7Q21', dIn: f(-3), plan: f(4), fix: '', dOut: '', sg: 2, msg: '부품을 준비하고 있어요', sym: '인쇄 시 줄이 생기고 라벨 감지가 잘 안 돼요', work: '프린트 헤드 교체 예정', price: 385000, free: false },
-      { team: '유상 PDA', no: '4255', name: 'ZEBRA PDA TC52', sn: '…0931', dIn: f(-1), plan: '', fix: '', dOut: '', sg: 1, msg: '점검 후 견적을 안내드릴 예정이에요', sym: '충전이 안 돼요', work: '', price: null, free: false },
+      { team: '라벨프린터', no: '474', name: 'ZEBRA 라벨프린터 ZT410', sn: '…7Q21', dIn: f(-3), qok: f(-1), plan: f(13), fix: '', dOut: '', sg: 2, msg: '부품을 준비하고 있어요', sym: '인쇄 시 줄이 생기고 라벨 감지가 잘 안 돼요', work: '프린트 헤드 교체 예정', price: 385000, free: false },
+      { team: '유상 PDA', no: '4255', name: 'ZEBRA PDA TC52', sn: '…0931', dIn: f(-1), qok: '', plan: '', fix: '', dOut: '', sg: 1, msg: '점검 후 견적을 안내드릴 예정이에요', sym: '충전이 안 돼요', work: '', price: null, free: false },
       { team: '유상 PDA', no: '4232', name: 'ZEBRA PDA MC3300', sn: '…5520', dIn: f(-11), plan: f(1), fix: f(-3), dOut: f(-2), sg: 4, msg: '출고됐어요', sym: '', work: '스캔엔진 교체, 동작 테스트 완료', price: 210000, free: false, courier: 'CJ대한통운', track: '512345678901' }
     ] };
   }

@@ -74,6 +74,18 @@
   .err b, .empty b { display:block; font-size:18px; color:var(--fg); margin-bottom:6px; }
   .foot { margin-top:22px; padding:16px 4px 0; font-size:12.5px; color:var(--mut); line-height:1.7; text-align:center; }
   .foot a { color:var(--sub); font-weight:700; text-decoration:none; }
+  .contact { display:flex; align-items:center; gap:10px; background:var(--card); border-radius:16px; padding:12px 12px 12px 16px; margin-top:8px; }
+  .contact div { flex:1; font-size:13px; color:var(--mut); line-height:1.35; }
+  .contact div b { display:block; font-size:16px; color:var(--fg); font-weight:800; }
+  .cbtn { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; gap:4px; height:42px; padding:0 14px; border-radius:12px; font-weight:800; font-size:14px; text-decoration:none; }
+  .cbtn.call { background:var(--pri); color:#fff; } .cbtn.sms { background:var(--pri-bg); color:var(--pri); }
+  .links { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .lk { display:flex; align-items:center; gap:10px; background:var(--card); border-radius:16px; padding:14px; text-decoration:none; color:var(--fg); }
+  .lk i { flex:0 0 auto; width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-style:normal; font-size:19px; background:var(--bg); }
+  .lk b { display:block; font-size:14.5px; font-weight:800; line-height:1.3; }
+  .lk small { display:block; font-size:12px; color:var(--mut); line-height:1.35; margin-top:1px; }
+  .lk.hi { grid-column:1/-1; background:linear-gradient(135deg,#e8f3ff,#f4f9ff); }
+  .lk.hi i { background:#fff; }
   .skel { height:230px; border-radius:20px; margin-bottom:12px; background:linear-gradient(90deg,#e9ecef 25%,#f4f6f8 50%,#e9ecef 75%); background-size:200% 100%; animation:sk 1.2s infinite; }
   @keyframes sk { to { background-position:-200% 0; } }
   .reload { border:0; background:none; color:var(--pri); font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
@@ -83,7 +95,8 @@
 <div class="wrap">
   <header><img src="icons/mark.png" alt=""><b>씨앤씨</b><span id="at"></span></header>
   <div id="app"><div class="hello"><h1>수리 진행 현황을<br>불러오고 있어요</h1></div><div class="skel"></div><div class="skel"></div></div>
-  <div class="foot">이 화면은 링크를 받은 분만 볼 수 있어요.<br>수리 관련 문의는 담당자에게 연락해 주세요 · <a href="https://www.cncbiz.co.kr/" target="_blank" rel="noopener">씨앤씨 홈페이지</a></div>
+  <div id="more"></div>
+  <div class="foot">이 화면은 링크를 받은 분만 볼 수 있어요.<br>© 씨앤씨 · 산업용 장비 수리 · 데이터복구</div>
 </div>
 <script>
   var API = 'https://script.google.com/macros/s/AKfycbw6Qsi7ZVZktH4xutPdGWHkYaM1u2nw6HGJDN3u8mBQVk0sbqBTpPliLXGwn20O_ix8/exec';
@@ -122,11 +135,40 @@
     return h + '</div>';
   }
 
+  // 회사 채널 (고객이 맡긴 장비 종류에 맞는 것을 맨 위에)
+  var UTM = 'utm_source=repair_track&utm_medium=link&utm_campaign=customer_tracking';
+  function u(url) { return url + (url.indexOf('?') < 0 ? '?' : '&') + UTM; }
+  var LINKS = {
+    home:  { i: '🏢', t: '회사 홈페이지', s: '씨앤씨 수리 서비스 소개', url: u('https://www.cncbiz.co.kr/') },
+    yt:    { i: '▶️', t: '유튜브', s: '실제 수리 과정 영상', url: 'https://www.youtube.com/@%EC%94%A8%EC%95%A4%EC%94%A8' },
+    store: { i: '🛒', t: '소모품·장비 구매', s: '라벨·리본·PDA 액세서리', url: u('https://cnc-industrial-store.co.kr/') },
+    data:  { i: '💾', t: '데이터복구', s: '하드·SSD·USB 복구 상담', url: u('https://www.data114.com/') },
+    blog:  { i: '📝', t: '네이버 블로그', s: '수리 사례·관리 팁', url: 'https://blog.naver.com/data114_com' },
+    tis:   { i: '📖', t: '장비 관리 가이드', s: '고장 증상별 대처법', url: 'https://cncblog.tistory.com/' }
+  };
+  function moreHtml(items) {
+    var teams = {}; items.forEach(function (x) { teams[x.team] = 1; });
+    var hi = null, order = ['home', 'yt', 'store', 'data', 'blog', 'tis'];
+    if (teams['라벨프린터']) hi = { i: '🏷️', t: '라벨·리본 소모품 주문하기', s: '쓰시는 라벨프린터에 맞는 라벨·리본을 바로 구매하세요', url: LINKS.store.url };
+    else if (teams['유상 PDA']) hi = { i: '📱', t: 'PDA 배터리·액세서리', s: '충전 거치대·배터리 등 소모품을 확인해 보세요', url: LINKS.store.url };
+    else if (teams['데이터복구']) hi = { i: '💾', t: '중요한 데이터, 미리 지키세요', s: '백업·복구 상담은 데이터114에서', url: LINKS.data.url };
+    var h = '<div class="sec">씨앤씨 더 알아보기</div><div class="links">';
+    if (hi) h += '<a class="lk hi" href="' + esc(hi.url) + '" target="_blank" rel="noopener"><i>' + hi.i + '</i><div><b>' + esc(hi.t) + '</b><small>' + esc(hi.s) + '</small></div></a>';
+    order.forEach(function (k) { var x = LINKS[k]; h += '<a class="lk" href="' + esc(x.url) + '" target="_blank" rel="noopener"><i>' + x.i + '</i><div><b>' + esc(x.t) + '</b><small>' + esc(x.s) + '</small></div></a>'; });
+    return h + '</div>';
+  }
+  function telFmt(p) { p = String(p || ''); return p.length === 11 ? p.slice(0, 3) + '-' + p.slice(3, 7) + '-' + p.slice(7) : p.length === 10 ? p.slice(0, 3) + '-' + p.slice(3, 6) + '-' + p.slice(6) : p; }
+  function contactHtml(rep) {
+    return (rep || []).filter(function (r) { return r && r.p; }).slice(0, 2).map(function (r) {
+      return '<div class="contact"><div>수리 담당 영업<b>' + esc(r.n) + '</b>' + esc(telFmt(r.p)) + '</div>' +
+        '<a class="cbtn sms" href="sms:' + esc(r.p) + '">💬 문자</a><a class="cbtn call" href="tel:' + esc(r.p) + '">📞 전화</a></div>';
+    }).join('');
+  }
   function draw(d) {
     $('at').innerHTML = esc(d.at) + ' 기준 · <button class="reload" onclick="load()">새로고침</button>';
     var go = d.items.filter(function (x) { return x.sg < 4; }), out = d.items.filter(function (x) { return x.sg === 4; });
     var h = '<div class="hello"><h1>' + esc(d.co) + '<br>고객님의 수리 현황이에요</h1>' +
-      '<p>' + (go.length ? '지금 ' + go.length + '대를 수리하고 있어요' : '진행 중인 수리가 없어요') + (d.rep && d.rep.length ? ' · 담당 ' + esc(d.rep.join(', ')) : '') + '</p></div>';
+      '<p>' + (go.length ? '지금 ' + go.length + '대를 수리하고 있어요' : '진행 중인 수리가 없어요') + '</p></div>' + contactHtml(d.rep);
     h += '<div class="sumrow"><div><em>진행 중</em><b>' + go.length + '대</b></div><div><em>최근 출고</em><b>' + out.length + '대</b></div></div>';
     if (!d.items.length) h += '<div class="empty" style="margin-top:14px"><b>표시할 장비가 없어요</b>최근 90일 안에 맡기신 장비가 없거나 아직 등록 전이에요.</div>';
     if (go.length) h += '<div class="sec">수리 진행 중</div>' + go.map(card).join('');
@@ -134,7 +176,7 @@
       h += '<div class="sec">최근 출고 <span style="font-weight:500;color:var(--mut);font-size:13px">· 90일</span></div>' + out.slice(0, 5).map(card).join('');
       if (out.length > 5) h += '<div id="moreBox" hidden>' + out.slice(5).map(card).join('') + '</div><button class="more" onclick="this.previousElementSibling.hidden=false;this.remove()">출고된 장비 ' + (out.length - 5) + '대 더 보기</button>';
     }
-    $('app').innerHTML = h;
+    $('app').innerHTML = h; $('more').innerHTML = moreHtml(d.items);
     document.title = d.co + ' · 씨앤씨 수리 진행 현황';
   }
   function fail(t) { $('app').innerHTML = '<div class="hello"></div><div class="err"><b>현황을 볼 수 없어요</b>' + esc(t) + '</div>'; }

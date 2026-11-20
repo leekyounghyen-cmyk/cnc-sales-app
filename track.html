@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>씨앤씨 수리 진행 현황</title>
+<meta property="og:title" content="씨앤씨 수리 진행 현황">
+<meta property="og:description" content="맡기신 장비의 수리 진행 상황을 한눈에 확인하세요">
+<meta property="og:image" content="https://leekyounghyen-cmyk.github.io/cnc-sales-app/icons/og.png">
+<link rel="icon" href="icons/favicon.png">
+<meta name="theme-color" content="#f2f4f7">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root { --bg:#f2f4f7; --fg:#191f28; --sub:#4e5968; --mut:#8b95a1; --line:#e5e8eb; --card:#fff; --pri:#3182f6; --pri-bg:#e8f3ff; --ok:#00a76f; --ok-bg:#e5f8f1; --warn:#f59f00; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { -webkit-text-size-adjust:100%; }
+  body { font-family:Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background:var(--bg); color:var(--fg); line-height:1.5; letter-spacing:-.01em; }
+  .wrap { max-width:520px; margin:0 auto; padding:0 16px calc(32px + env(safe-area-inset-bottom)); }
+  header { display:flex; align-items:center; gap:8px; padding:calc(14px + env(safe-area-inset-top)) 2px 10px; }
+  header img { width:26px; height:26px; border-radius:7px; }
+  header b { font-size:16px; font-weight:800; }
+  header span { margin-left:auto; font-size:12px; color:var(--mut); }
+  .hello { padding:14px 2px 6px; }
+  .hello h1 { font-size:23px; font-weight:800; line-height:1.35; letter-spacing:-.02em; }
+  .hello p { font-size:14px; color:var(--sub); margin-top:4px; }
+  .sumrow { display:flex; gap:8px; margin:14px 0 4px; }
+  .sumrow div { flex:1; background:var(--card); border-radius:14px; padding:12px 14px; }
+  .sumrow em { display:block; font-style:normal; font-size:12.5px; color:var(--mut); }
+  .sumrow b { font-size:20px; font-weight:800; }
+  .sec { font-size:15px; font-weight:800; margin:22px 2px 10px; color:var(--sub); }
+  .card { background:var(--card); border-radius:20px; padding:18px 18px 16px; margin-bottom:12px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+  .top { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--mut); }
+  .team { background:var(--pri-bg); color:var(--pri); font-weight:700; border-radius:6px; padding:2px 7px; font-size:12px; }
+  .done .team { background:var(--ok-bg); color:var(--ok); }
+  .name { font-size:17px; font-weight:800; margin-top:8px; line-height:1.35; word-break:keep-all; }
+  .msg { font-size:21px; font-weight:800; margin-top:12px; color:var(--pri); letter-spacing:-.02em; word-break:keep-all; }
+  .done .msg { color:var(--ok); }
+  .eta { font-size:14px; color:var(--sub); margin-top:2px; }
+  .eta b { color:var(--fg); }
+  /* 진행 단계 */
+  .steps { position:relative; display:flex; justify-content:space-between; margin:20px 2px 4px; }
+  .steps::before { content:""; position:absolute; left:12px; right:12px; top:11px; height:4px; border-radius:2px; background:var(--line); }
+  .steps .bar { position:absolute; left:12px; top:11px; height:4px; border-radius:2px; background:var(--pri); transition:width .6s ease; }
+  .done .steps .bar { background:var(--ok); }
+  .st { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; width:20%; text-align:center; }
+  .st i { width:26px; height:26px; border-radius:13px; background:var(--card); border:3px solid var(--line); display:flex; align-items:center; justify-content:center; font-style:normal; font-size:12px; color:#fff; font-weight:800; }
+  .st.on i { background:var(--pri); border-color:var(--pri); }
+  .done .st.on i { background:var(--ok); border-color:var(--ok); }
+  .st.now i { box-shadow:0 0 0 6px rgba(49,130,246,.18); }
+  .done .st.now i { box-shadow:0 0 0 6px rgba(0,167,111,.16); }
+  .st span { font-size:11.5px; color:var(--mut); margin-top:6px; line-height:1.3; word-break:keep-all; }
+  .st.on span { color:var(--fg); font-weight:700; }
+  .st small { font-size:11px; color:var(--mut); }
+  /* 날짜 */
+  .dates { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:16px; }
+  .dates div { background:var(--bg); border-radius:12px; padding:10px 10px; text-align:center; }
+  .dates em { display:block; font-style:normal; font-size:12px; color:var(--mut); }
+  .dates b { font-size:15px; font-weight:800; }
+  .dates .no b { color:var(--mut); font-weight:600; }
+  .row { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:12px 2px 0; margin-top:12px; border-top:1px solid var(--line); font-size:14px; }
+  .row em { font-style:normal; color:var(--mut); flex:0 0 auto; }
+  .row b { font-weight:800; font-size:16px; text-align:right; }
+  .row small { font-size:12px; color:var(--mut); font-weight:500; }
+  .note { margin-top:10px; font-size:14px; color:var(--sub); background:var(--bg); border-radius:12px; padding:10px 12px; white-space:pre-wrap; word-break:break-word; }
+  .note em { display:block; font-style:normal; font-size:12px; color:var(--mut); margin-bottom:2px; }
+  .ship { display:flex; align-items:center; gap:10px; margin-top:12px; padding:12px; border-radius:14px; background:var(--ok-bg); }
+  .ship div { flex:1; font-size:13.5px; color:var(--sub); }
+  .ship b { display:block; font-size:15px; color:var(--fg); }
+  .btn { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 14px; border-radius:11px; background:var(--ok); color:#fff; font-weight:700; font-size:14px; text-decoration:none; }
+  .more { display:block; width:100%; height:44px; border:0; border-radius:12px; background:var(--card); color:var(--sub); font:inherit; font-weight:700; font-size:14px; margin:4px 0 12px; }
+  .empty, .err { background:var(--card); border-radius:20px; padding:36px 20px; text-align:center; color:var(--sub); font-size:15px; }
+  .err b, .empty b { display:block; font-size:18px; color:var(--fg); margin-bottom:6px; }
+  .foot { margin-top:22px; padding:16px 4px 0; font-size:12.5px; color:var(--mut); line-height:1.7; text-align:center; }
+  .foot a { color:var(--sub); font-weight:700; text-decoration:none; }
+  .skel { height:230px; border-radius:20px; margin-bottom:12px; background:linear-gradient(90deg,#e9ecef 25%,#f4f6f8 50%,#e9ecef 75%); background-size:200% 100%; animation:sk 1.2s infinite; }
+  @keyframes sk { to { background-position:-200% 0; } }
+  .reload { border:0; background:none; color:var(--pri); font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><img src="icons/mark.png" alt=""><b>씨앤씨</b><span id="at"></span></header>
+  <div id="app"><div class="hello"><h1>수리 진행 현황을<br>불러오고 있어요</h1></div><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot">이 화면은 링크를 받은 분만 볼 수 있어요.<br>수리 관련 문의는 담당자에게 연락해 주세요 · <a href="https://www.cncbiz.co.kr/" target="_blank" rel="noopener">씨앤씨 홈페이지</a></div>
+</div>
+<script>
+  var API = 'https://script.google.com/macros/s/AKfycbw6Qsi7ZVZktH4xutPdGWHkYaM1u2nw6HGJDN3u8mBQVk0sbqBTpPliLXGwn20O_ix8/exec';
+  var STEPS = ['입고', '점검·견적', '수리', '출고 준비', '출고'];
+  var K = (new URLSearchParams(location.search).get('k') || '').toLowerCase();
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var WD = ['일', '월', '화', '수', '목', '금', '토'];
+  function md(d, wd) { if (!d) return ''; var p = d.split('-'); var s = (+p[1]) + '/' + (+p[2]); if (wd) s += '(' + WD[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; return s; }
+  function won(v) { return Math.round(v).toLocaleString('ko-KR') + '원'; }
+  function trackUrl(it) { return 'https://search.naver.com/search.naver?query=' + encodeURIComponent((it.courier && it.courier.indexOf('직접') < 0 ? it.courier + ' ' : '택배 ') + it.track); }
+
+  function card(it) {
+    var done = it.sg === 4, h = '<div class="card' + (done ? ' done' : '') + '">';
+    h += '<div class="top"><span class="team">' + esc(it.team) + '</span>접수번호 ' + esc(it.no) + (it.sn ? ' · S/N ' + esc(it.sn) : '') + '</div>';
+    h += '<div class="name">' + esc(it.name || '수리 장비') + '</div>';
+    h += '<div class="msg">' + esc(it.msg) + '</div>';
+    if (done && it.dOut) h += '<div class="eta"><b>' + md(it.dOut, true) + '</b> 출고</div>';
+    else if (it.plan) h += '<div class="eta">출고 예정 <b>' + md(it.plan, true) + '</b></div>';
+    // 진행 단계
+    var stepDate = [it.dIn, '', '', it.fix, it.dOut];
+    h += '<div class="steps"><div class="bar" style="width:calc((100% - 24px) * ' + (it.sg / 4) + ')"></div>';
+    STEPS.forEach(function (s, i) {
+      var on = i <= it.sg, now = i === it.sg;
+      h += '<div class="st' + (on ? ' on' : '') + (now ? ' now' : '') + '"><i>' + (on && !now ? '✓' : '') + '</i><span>' + s + '</span>' + (on && stepDate[i] ? '<small>' + md(stepDate[i]) + '</small>' : '') + '</div>';
+    });
+    h += '</div>';
+    // 날짜
+    var dc = function (lab, d) { return '<div' + (d ? '' : ' class="no"') + '><em>' + lab + '</em><b>' + (d ? md(d, true) : '미정') + '</b></div>'; };
+    h += '<div class="dates">' + dc('맡긴 날', it.dIn) + dc('출고 예정', done ? (it.plan || it.dOut) : it.plan) + dc('출고일', it.dOut) + '</div>';
+    // 견적 금액
+    if (it.price != null || it.free) h += '<div class="row"><em>견적 금액</em><b>' + (it.free ? '무상 수리' : won(it.price) + ' <small>VAT 별도</small>') + '</b></div>';
+    if (it.sym) h += '<div class="note"><em>입고 증상</em>' + esc(it.sym) + '</div>';
+    if (it.work) h += '<div class="note"><em>수리 내용</em>' + esc(it.work) + '</div>';
+    if (done && it.track) h += '<div class="ship"><div>🚚 ' + esc(it.courier || '택배') + '<b>' + esc(it.track) + '</b></div><a class="btn" href="' + esc(trackUrl(it)) + '" target="_blank" rel="noopener">배송 조회</a></div>';
+    return h + '</div>';
+  }
+
+  function draw(d) {
+    $('at').innerHTML = esc(d.at) + ' 기준 · <button class="reload" onclick="load()">새로고침</button>';
+    var go = d.items.filter(function (x) { return x.sg < 4; }), out = d.items.filter(function (x) { return x.sg === 4; });
+    var h = '<div class="hello"><h1>' + esc(d.co) + '<br>고객님의 수리 현황이에요</h1>' +
+      '<p>' + (go.length ? '지금 ' + go.length + '대를 수리하고 있어요' : '진행 중인 수리가 없어요') + (d.rep && d.rep.length ? ' · 담당 ' + esc(d.rep.join(', ')) : '') + '</p></div>';
+    h += '<div class="sumrow"><div><em>진행 중</em><b>' + go.length + '대</b></div><div><em>최근 출고</em><b>' + out.length + '대</b></div></div>';
+    if (!d.items.length) h += '<div class="empty" style="margin-top:14px"><b>표시할 장비가 없어요</b>최근 90일 안에 맡기신 장비가 없거나 아직 등록 전이에요.</div>';
+    if (go.length) h += '<div class="sec">수리 진행 중</div>' + go.map(card).join('');
+    if (out.length) {
+      h += '<div class="sec">최근 출고 <span style="font-weight:500;color:var(--mut);font-size:13px">· 90일</span></div>' + out.slice(0, 5).map(card).join('');
+      if (out.length > 5) h += '<div id="moreBox" hidden>' + out.slice(5).map(card).join('') + '</div><button class="more" onclick="this.previousElementSibling.hidden=false;this.remove()">출고된 장비 ' + (out.length - 5) + '대 더 보기</button>';
+    }
+    $('app').innerHTML = h;
+    document.title = d.co + ' · 씨앤씨 수리 진행 현황';
+  }
+  function fail(t) { $('app').innerHTML = '<div class="hello"></div><div class="err"><b>현황을 볼 수 없어요</b>' + esc(t) + '</div>'; }
+  function load() {
+    if (!/^[a-f0-9]{20}$/.test(K)) { fail('링크 주소가 올바르지 않아요. 받으신 링크를 다시 눌러 주세요.'); return; }
+    fetch(API + '?api=track&k=' + K + '&t=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || d.error) { fail((d && d.error) || '잠시 후 다시 시도해 주세요.'); return; }
+      draw(d);
+    }).catch(function () { fail('인터넷 연결을 확인한 뒤 다시 시도해 주세요.'); });
+  }
+  load();
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && /^[a-f0-9]{20}$/.test(K)) load(); });
+</script>
+</body>
+</html>

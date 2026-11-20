@@ -87,6 +87,19 @@
   .lk small { display:block; font-size:12px; color:var(--mut); line-height:1.35; margin-top:1px; }
   .lk.hi { grid-column:1/-1; background:linear-gradient(135deg,#e8f3ff,#f4f9ff); }
   .lk.hi i { background:#fff; }
+  .phs { margin-top:12px; }
+  .phs > em { display:block; font-style:normal; font-size:12px; color:var(--mut); margin:0 2px 6px; }
+  .phg { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .phg button { position:relative; border:0; padding:0; border-radius:10px; overflow:hidden; background:var(--bg); aspect-ratio:1; cursor:pointer; }
+  .phg img { display:block; width:100%; height:100%; object-fit:cover; }
+  .phg span { position:absolute; left:5px; top:5px; background:rgba(0,0,0,.62); color:#fff; font-size:11px; font-weight:700; border-radius:6px; padding:1px 6px; }
+  .phg span.a { background:rgba(0,167,111,.92); }
+  #lb { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.9); display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px; }
+  #lb.on { display:flex; }
+  #lb img { max-width:100%; max-height:80vh; border-radius:10px; }
+  #lb p { color:#fff; font-size:14px; margin-top:12px; opacity:.85; }
+  #lb button { position:absolute; top:calc(12px + env(safe-area-inset-top)); right:14px; width:44px; height:44px; border:0; border-radius:22px; background:rgba(255,255,255,.15); color:#fff; font-size:20px; }
+  .demo { background:#fff4e5; color:#b35c00; border-radius:12px; padding:10px 12px; font-size:13px; font-weight:600; margin-top:8px; }
   .skel { height:230px; border-radius:20px; margin-bottom:12px; background:linear-gradient(90deg,#e9ecef 25%,#f4f6f8 50%,#e9ecef 75%); background-size:200% 100%; animation:sk 1.2s infinite; }
   @keyframes sk { to { background-position:-200% 0; } }
   .reload { border:0; background:none; color:var(--pri); font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
@@ -97,6 +110,7 @@
   <header><img src="icons/mark.png" alt=""><b>씨앤씨</b><span id="at"></span></header>
   <div id="app"><div class="hello"><h1>수리 진행 현황을<br>불러오고 있어요</h1></div><div class="skel"></div><div class="skel"></div></div>
   <div id="more"></div>
+  <div id="lb" onclick="if(event.target===this)lbClose()"><button type="button" onclick="lbClose()">✕</button><img id="lbImg" alt=""><p id="lbCap"></p></div>
   <div class="foot">이 화면은 링크를 받은 분만 볼 수 있어요.<br>© 씨앤씨 · 산업용 장비 수리 · 데이터복구</div>
 </div>
 <script>
@@ -132,6 +146,11 @@
     if (it.price != null || it.free) h += '<div class="row"><em>견적 금액</em><b>' + (it.free ? '무상 수리' : won(it.price) + ' <small>VAT 별도</small>') + '</b></div>';
     if (it.sym) h += '<div class="note"><em>입고 증상</em>' + esc(it.sym) + '</div>';
     if (it.work) h += '<div class="note"><em>수리 내용</em>' + esc(it.work) + '</div>';
+    if (it.ph && it.ph.length) {
+      h += '<div class="phs"><em>📷 이렇게 수리했어요 · 눌러서 크게 보기</em><div class="phg">' + it.ph.map(function (p) {
+        PH[p.id] = p; return '<button type="button" onclick="lbOpen(\'' + esc(p.id) + '\')"><img src="' + p.th + '" alt="수리 ' + p.s + ' 사진" loading="lazy"><span' + (p.s === '후' ? ' class="a"' : '') + '>수리 ' + p.s + '</span></button>';
+      }).join('') + '</div></div>';
+    }
     if (done && it.track) h += '<div class="ship"><div>🚚 ' + esc(it.courier || '택배') + '<b>' + esc(it.track) + '</b></div><a class="btn" href="' + esc(trackUrl(it)) + '" target="_blank" rel="noopener">배송 조회</a></div>';
     return h + '</div>';
   }
@@ -165,6 +184,32 @@
         '<a class="cbtn sms" href="sms:' + esc(r.p) + '">💬 문자</a><a class="cbtn call" href="tel:' + esc(r.p) + '">📞 전화</a></div>';
     }).join('');
   }
+  var PH = {};
+  function lbClose() { $('lb').classList.remove('on'); $('lbImg').removeAttribute('src'); }
+  function lbOpen(id) {
+    var p = PH[id]; if (!p) return;
+    $('lbImg').src = p.th; $('lbCap').textContent = '수리 ' + p.s + ' 사진 · 불러오는 중…'; $('lb').classList.add('on');
+    if (p.full) { $('lbImg').src = p.full; $('lbCap').textContent = '수리 ' + p.s + ' 사진'; return; }
+    if (DEMO) { $('lbCap').textContent = '수리 ' + p.s + ' 사진 (예시)'; return; }
+    fetch(API + '?api=trkimg&k=' + K + '&id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.data) { p.full = d.data; if ($('lb').classList.contains('on')) { $('lbImg').src = d.data; $('lbCap').textContent = '수리 ' + p.s + ' 사진'; } }
+      else $('lbCap').textContent = (d && d.error) || '사진을 불러오지 못했어요';
+    }).catch(function () { $('lbCap').textContent = '사진을 불러오지 못했어요'; });
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') lbClose(); });
+  // 예시 화면 (?demo=1) — 실제 고객 데이터 없이 화면 모양만 보여줌
+  var DEMO = /[?&]demo=1/.test(location.search);
+  function demoPic(t, c) { return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect width="300" height="300" fill="' + c + '"/><text x="150" y="160" font-size="30" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="700">' + t + '</text></svg>'); }
+  function demoData() {
+    var t = new Date(), f = function (n) { var x = new Date(t.getTime() + n * 864e5); return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2); };
+    return { co: '(예시) 한빛물류', at: (t.getMonth() + 1) + '월 ' + t.getDate() + '일 ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2), rep: [{ n: '홍길동', p: '01012345678' }], items: [
+      { team: '라벨프린터', no: '474', name: 'ZEBRA 라벨프린터 ZT410', sn: '…7Q21', dIn: f(-3), plan: f(4), fix: '', dOut: '', sg: 2, msg: '부품을 준비하고 있어요', sym: '인쇄 시 줄이 생기고 라벨 감지가 잘 안 돼요', work: '프린트 헤드 교체 예정', price: 385000, free: false,
+        ph: [{ id: 'd1', s: '전', th: demoPic('수리 전', '#8b95a1') }, { id: 'd2', s: '전', th: demoPic('수리 전', '#6b7684') }] },
+      { team: '유상 PDA', no: '4255', name: 'ZEBRA PDA TC52', sn: '…0931', dIn: f(-1), plan: '', fix: '', dOut: '', sg: 1, msg: '점검 후 견적을 안내드릴 예정이에요', sym: '충전이 안 돼요', work: '', price: null, free: false },
+      { team: '유상 PDA', no: '4232', name: 'ZEBRA PDA MC3300', sn: '…5520', dIn: f(-11), plan: f(-2), fix: f(-3), dOut: f(-2), sg: 4, msg: '출고됐어요', sym: '', work: '스캔엔진 교체, 동작 테스트 완료', price: 210000, free: false, courier: 'CJ대한통운', track: '512345678901',
+        ph: [{ id: 'd3', s: '전', th: demoPic('수리 전', '#8b95a1') }, { id: 'd4', s: '후', th: demoPic('수리 후', '#00a76f') }, { id: 'd5', s: '후', th: demoPic('수리 후', '#12b886') }] }
+    ] };
+  }
   function draw(d) {
     $('at').innerHTML = esc(d.at) + ' 기준 · <button class="reload" onclick="load()">새로고침</button>';
     var go = d.items.filter(function (x) { return x.sg < 4; }), out = d.items.filter(function (x) { return x.sg === 4; });
@@ -177,11 +222,13 @@
       h += '<div class="sec">최근 출고 <span style="font-weight:500;color:var(--mut);font-size:13px">· 90일</span></div>' + out.slice(0, 5).map(card).join('');
       if (out.length > 5) h += '<div id="moreBox" hidden>' + out.slice(5).map(card).join('') + '</div><button class="more" onclick="this.previousElementSibling.hidden=false;this.remove()">출고된 장비 ' + (out.length - 5) + '대 더 보기</button>';
     }
+    if (DEMO) h = '<div class="demo">👀 예시 화면이에요 · 실제 고객 데이터가 아니에요</div>' + h;
     $('app').innerHTML = h; $('more').innerHTML = moreHtml(d.items);
     document.title = d.co + ' · 씨앤씨 수리 진행 현황';
   }
   function fail(t) { $('app').innerHTML = '<div class="hello"></div><div class="err"><b>현황을 볼 수 없어요</b>' + esc(t) + '</div>'; }
   function load() {
+    if (DEMO) { draw(demoData()); $('at').textContent = '예시 화면'; return; }
     if (!/^[a-f0-9]{20}$/.test(K)) { fail('링크 주소가 올바르지 않아요. 받으신 링크를 다시 눌러 주세요.'); return; }
     fetch(API + '?api=track&k=' + K + '&t=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
       if (!d || d.error) { fail((d && d.error) || '잠시 후 다시 시도해 주세요.'); return; }
@@ -189,7 +236,7 @@
     }).catch(function () { fail('인터넷 연결을 확인한 뒤 다시 시도해 주세요.'); });
   }
   load();
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && /^[a-f0-9]{20}$/.test(K)) load(); });
+  document.addEventListener('visibilitychange', function () { if (!DEMO && document.visibilityState === 'visible' && /^[a-f0-9]{20}$/.test(K) && !$('lb').classList.contains('on')) load(); });
 </script>
 </body>
 </html>

@@ -141,7 +141,7 @@
   var LINKS = {
     home:  { i: '🏢', t: '회사 홈페이지', s: '씨앤씨 수리 서비스 소개', url: u('https://www.cncbiz.co.kr/') },
     yt:    { i: '▶️', t: '유튜브', s: '실제 수리 과정 영상', url: 'https://www.youtube.com/@%EC%94%A8%EC%95%A4%EC%94%A8' },
-    store: { i: '🛒', t: '소모품·장비 구매', s: '라벨·리본·PDA 액세서리', url: u('https://cnc-industrial-store.co.kr/') },
+    store: { i: '🛒', t: '소모품·장비 구매', s: '산업용 장비·소모품', url: u('https://cnc-industrial-store.co.kr/') },
     data:  { i: '💾', t: '데이터복구', s: '하드·SSD·USB 복구 상담', url: u('https://www.data114.com/') },
     blog:  { i: '📝', t: '네이버 블로그', s: '수리 사례·관리 팁', url: 'https://blog.naver.com/data114_com' },
     tis:   { i: '📖', t: '장비 관리 가이드', s: '고장 증상별 대처법', url: 'https://cncblog.tistory.com/' }
@@ -150,7 +150,7 @@
     var teams = {}; items.forEach(function (x) { teams[x.team] = 1; });
     var hi = null, order = ['home', 'yt', 'store', 'data', 'blog', 'tis'];
     if (teams['라벨프린터']) hi = { i: '🏷️', t: '라벨·리본 소모품 주문하기', s: '쓰시는 라벨프린터에 맞는 라벨·리본을 바로 구매하세요', url: LINKS.store.url };
-    else if (teams['유상 PDA']) hi = { i: '📱', t: 'PDA 배터리·액세서리', s: '충전 거치대·배터리 등 소모품을 확인해 보세요', url: LINKS.store.url };
+    else if (teams['유상 PDA']) hi = { i: '📱', t: 'PDA·산업용 장비 둘러보기', s: '필요한 장비·소모품을 확인해 보세요', url: LINKS.store.url };
     else if (teams['데이터복구']) hi = { i: '💾', t: '중요한 데이터, 미리 지키세요', s: '백업·복구 상담은 데이터114에서', url: LINKS.data.url };
     var h = '<div class="sec">씨앤씨 더 알아보기</div><div class="links">';
     if (hi) h += '<a class="lk hi" href="' + esc(hi.url) + '" target="_blank" rel="noopener"><i>' + hi.i + '</i><div><b>' + esc(hi.t) + '</b><small>' + esc(hi.s) + '</small></div></a>';

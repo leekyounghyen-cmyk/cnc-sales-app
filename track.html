@@ -82,7 +82,8 @@
   .links { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
   .lk { display:flex; align-items:center; gap:10px; background:var(--card); border-radius:16px; padding:14px; text-decoration:none; color:var(--fg); }
   .lk i { flex:0 0 auto; width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-style:normal; font-size:19px; background:var(--bg); }
-  .lk b { display:block; font-size:14.5px; font-weight:800; line-height:1.3; }
+  .lk b { display:block; font-size:14.5px; font-weight:800; line-height:1.3; word-break:keep-all; }
+  .lk div { min-width:0; } .lk small { word-break:keep-all; }
   .lk small { display:block; font-size:12px; color:var(--mut); line-height:1.35; margin-top:1px; }
   .lk.hi { grid-column:1/-1; background:linear-gradient(135deg,#e8f3ff,#f4f9ff); }
   .lk.hi i { background:#fff; }
@@ -141,10 +142,10 @@
   var LINKS = {
     home:  { i: '🏢', t: '회사 홈페이지', s: '씨앤씨 수리 서비스 소개', url: u('https://www.cncbiz.co.kr/') },
     yt:    { i: '▶️', t: '유튜브', s: '실제 수리 과정 영상', url: 'https://www.youtube.com/@%EC%94%A8%EC%95%A4%EC%94%A8' },
-    store: { i: '🛒', t: '소모품·장비 구매', s: '산업용 장비·소모품', url: u('https://cnc-industrial-store.co.kr/') },
-    data:  { i: '💾', t: '데이터복구', s: '하드·SSD·USB 복구 상담', url: u('https://www.data114.com/') },
+    store: { i: '🛒', t: '장비·소모품', s: '산업용 장비·소모품', url: u('https://cnc-industrial-store.co.kr/') },
+    data:  { i: '💾', t: '데이터복구', s: '하드·SSD·USB 복구', url: u('https://www.data114.com/') },
     blog:  { i: '📝', t: '네이버 블로그', s: '수리 사례·관리 팁', url: 'https://blog.naver.com/data114_com' },
-    tis:   { i: '📖', t: '장비 관리 가이드', s: '고장 증상별 대처법', url: 'https://cncblog.tistory.com/' }
+    tis:   { i: '📖', t: '관리 가이드', s: '고장 증상별 대처법', url: 'https://cncblog.tistory.com/' }
   };
   function moreHtml(items) {
     var teams = {}; items.forEach(function (x) { teams[x.team] = 1; });

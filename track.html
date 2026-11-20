@@ -100,6 +100,12 @@
   #lb p { color:#fff; font-size:14px; margin-top:12px; opacity:.85; }
   #lb button { position:absolute; top:calc(12px + env(safe-area-inset-top)); right:14px; width:44px; height:44px; border:0; border-radius:22px; background:rgba(255,255,255,.15); color:#fff; font-size:20px; }
   .demo { background:#fff4e5; color:#b35c00; border-radius:12px; padding:10px 12px; font-size:13px; font-weight:600; margin-top:8px; }
+  .early { display:flex; align-items:center; gap:10px; margin-top:12px; padding:12px 14px; border-radius:14px; background:linear-gradient(135deg,#00a76f,#12b886); color:#fff; box-shadow:0 6px 16px rgba(0,167,111,.22); }
+  .early i { font-style:normal; font-size:26px; line-height:1; }
+  .early b { display:block; font-size:16.5px; font-weight:800; letter-spacing:-.02em; }
+  .early small { display:block; font-size:12.5px; opacity:.92; margin-top:1px; }
+  .early.soon { background:linear-gradient(135deg,#3182f6,#4c95ff); box-shadow:0 6px 16px rgba(49,130,246,.22); }
+  .ontime { margin-top:8px; font-size:13px; color:var(--ok); font-weight:700; }
   .skel { height:230px; border-radius:20px; margin-bottom:12px; background:linear-gradient(90deg,#e9ecef 25%,#f4f6f8 50%,#e9ecef 75%); background-size:200% 100%; animation:sk 1.2s infinite; }
   @keyframes sk { to { background-position:-200% 0; } }
   .reload { border:0; background:none; color:var(--pri); font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
@@ -121,6 +127,8 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   var WD = ['일', '월', '화', '수', '목', '금', '토'];
   function md(d, wd) { if (!d) return ''; var p = d.split('-'); var s = (+p[1]) + '/' + (+p[2]); if (wd) s += '(' + WD[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; return s; }
+  function dd(a, b) { var p = a.split('-'), q = b.split('-'); return Math.round((Date.UTC(+q[0], +q[1] - 1, +q[2]) - Date.UTC(+p[0], +p[1] - 1, +p[2])) / 864e5); }   // a → b 며칠
+  function today() { var t = new Date(); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); }
   function won(v) { return Math.round(v).toLocaleString('ko-KR') + '원'; }
   function trackUrl(it) { return 'https://search.naver.com/search.naver?query=' + encodeURIComponent((it.courier && it.courier.indexOf('직접') < 0 ? it.courier + ' ' : '택배 ') + it.track); }
 
@@ -131,6 +139,15 @@
     h += '<div class="msg">' + esc(it.msg) + '</div>';
     if (done && it.dOut) h += '<div class="eta"><b>' + md(it.dOut, true) + '</b> 출고</div>';
     else if (it.plan) h += '<div class="eta">출고 예정 <b>' + md(it.plan, true) + '</b></div>';
+    // 예정보다 빨리: 출고 예정일보다 일찍 출고 / 예정일 전에 수리 끝남
+    if (done && it.dOut && it.plan) {
+      var ed = dd(it.dOut, it.plan);
+      if (ed > 0) h += '<div class="early"><i>🎉</i><div><b>예정보다 ' + ed + '일 빨리 출고됐어요!</b><small>출고 예정 ' + md(it.plan, true) + ' → 실제 출고 ' + md(it.dOut, true) + '</small></div></div>';
+      else if (ed === 0) h += '<div class="ontime">✓ 약속한 날짜에 맞춰 출고했어요</div>';
+    } else if (!done && it.sg === 3 && it.plan && /수리/.test(it.msg)) {
+      var sd = dd(today(), it.plan);
+      if (sd > 0) h += '<div class="early soon"><i>⚡</i><div><b>예정보다 빨리 수리가 끝났어요!</b><small>출고 예정 ' + md(it.plan, true) + '보다 ' + sd + '일 앞서 출고를 준비하고 있어요</small></div></div>';
+    }
     // 진행 단계
     var stepDate = [it.dIn, '', '', it.fix, it.dOut];
     h += '<div class="steps"><div class="bar" style="width:calc((100% - 24px) * ' + (it.sg / 4) + ')"></div>';
@@ -203,11 +220,9 @@
   function demoData() {
     var t = new Date(), f = function (n) { var x = new Date(t.getTime() + n * 864e5); return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2); };
     return { co: '(예시) 한빛물류', at: (t.getMonth() + 1) + '월 ' + t.getDate() + '일 ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2), rep: [{ n: '홍길동', p: '01012345678' }], items: [
-      { team: '라벨프린터', no: '474', name: 'ZEBRA 라벨프린터 ZT410', sn: '…7Q21', dIn: f(-3), plan: f(4), fix: '', dOut: '', sg: 2, msg: '부품을 준비하고 있어요', sym: '인쇄 시 줄이 생기고 라벨 감지가 잘 안 돼요', work: '프린트 헤드 교체 예정', price: 385000, free: false,
-        ph: [{ id: 'd1', s: '전', th: demoPic('수리 전', '#8b95a1') }, { id: 'd2', s: '전', th: demoPic('수리 전', '#6b7684') }] },
+      { team: '라벨프린터', no: '474', name: 'ZEBRA 라벨프린터 ZT410', sn: '…7Q21', dIn: f(-3), plan: f(4), fix: '', dOut: '', sg: 2, msg: '부품을 준비하고 있어요', sym: '인쇄 시 줄이 생기고 라벨 감지가 잘 안 돼요', work: '프린트 헤드 교체 예정', price: 385000, free: false },
       { team: '유상 PDA', no: '4255', name: 'ZEBRA PDA TC52', sn: '…0931', dIn: f(-1), plan: '', fix: '', dOut: '', sg: 1, msg: '점검 후 견적을 안내드릴 예정이에요', sym: '충전이 안 돼요', work: '', price: null, free: false },
-      { team: '유상 PDA', no: '4232', name: 'ZEBRA PDA MC3300', sn: '…5520', dIn: f(-11), plan: f(-2), fix: f(-3), dOut: f(-2), sg: 4, msg: '출고됐어요', sym: '', work: '스캔엔진 교체, 동작 테스트 완료', price: 210000, free: false, courier: 'CJ대한통운', track: '512345678901',
-        ph: [{ id: 'd3', s: '전', th: demoPic('수리 전', '#8b95a1') }, { id: 'd4', s: '후', th: demoPic('수리 후', '#00a76f') }, { id: 'd5', s: '후', th: demoPic('수리 후', '#12b886') }] }
+      { team: '유상 PDA', no: '4232', name: 'ZEBRA PDA MC3300', sn: '…5520', dIn: f(-11), plan: f(1), fix: f(-3), dOut: f(-2), sg: 4, msg: '출고됐어요', sym: '', work: '스캔엔진 교체, 동작 테스트 완료', price: 210000, free: false, courier: 'CJ대한통운', track: '512345678901' }
     ] };
   }
   function draw(d) {

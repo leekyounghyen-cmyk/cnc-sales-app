@@ -130,7 +130,23 @@
   function dd(a, b) { var p = a.split('-'), q = b.split('-'); return Math.round((Date.UTC(+q[0], +q[1] - 1, +q[2]) - Date.UTC(+p[0], +p[1] - 1, +p[2])) / 864e5); }   // a → b 며칠
   function today() { var t = new Date(); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); }
   function won(v) { return Math.round(v).toLocaleString('ko-KR') + '원'; }
-  function trackUrl(it) { return 'https://search.naver.com/search.naver?query=' + encodeURIComponent((it.courier && it.courier.indexOf('직접') < 0 ? it.courier + ' ' : '택배 ') + it.track); }
+  // 배송 조회: 택배사 사이트로 바로 (2026-11-25) · 한진은 번호로 바로 여는 주소가 없어서 조회 화면 + 송장번호 자동 복사
+  var CUR = [
+    [/CJ|대한통운/i, 'https://trace.cjlogistics.com/next/tracking.html?wblNo='],
+    [/롯데/, 'https://www.lotteglogis.com/home/reservation/tracking/linkView?InvNo='],
+    [/우체국/, 'https://service.epost.go.kr/trace.RetrieveDomRigiTraceList.comm?sid1='],
+    [/로젠/, 'https://www.ilogen.com/web/personal/trace/'],
+    [/경동/, 'https://kdexp.com/service/delivery/etc/delivery.do?barcode='],
+    [/한진/, 'https://www.hanjin.com/kor/CMS/DeliveryMgr/WaybillSch.do?mCode=MN038', 1]
+  ];
+  function trkNo(it) { return String(it.track || '').replace(/[^0-9A-Za-z]/g, ''); }
+  function naverUrl(it) { return 'https://search.naver.com/search.naver?query=' + encodeURIComponent((it.courier && it.courier.indexOf('직접') < 0 ? it.courier + ' ' : '택배 ') + it.track); }
+  function curOf(it) { var c = it.courier || ''; for (var i = 0; i < CUR.length; i++) if (CUR[i][0].test(c)) return CUR[i]; return null; }
+  function trackUrl(it) { var x = curOf(it), n = trkNo(it); if (!x || !n) return naverUrl(it); return x[2] ? x[1] : x[1] + encodeURIComponent(n); }
+  function cpTrk(n, el) {
+    var done = function () { var s = el && el.parentNode && el.parentNode.parentNode && el.parentNode.parentNode.querySelector('.cpn'); if (s) s.textContent = '송장번호를 복사했어요 · 조회 화면에 붙여넣어 주세요'; };
+    try { navigator.clipboard.writeText(n).then(done, done); } catch (e) { done(); }
+  }
 
   function card(it) {
     var done = it.sg === 4, h = '<div class="card' + (done ? ' done' : '') + '">';
@@ -169,7 +185,9 @@
         PH[p.id] = p; return '<button type="button" onclick="lbOpen(\'' + esc(p.id) + '\')"><img src="' + p.th + '" alt="수리 ' + p.s + ' 사진" loading="lazy"><span' + (p.s === '후' ? ' class="a"' : '') + '>수리 ' + p.s + '</span></button>';
       }).join('') + '</div></div>';
     }
-    if (done && it.track) h += '<div class="ship"><div>🚚 ' + esc(it.courier || '택배') + '<b>' + esc(it.track) + '</b></div><a class="btn" href="' + esc(trackUrl(it)) + '" target="_blank" rel="noopener">배송 조회</a></div>';
+    if (done && it.track) { var cx = curOf(it), cp = cx && cx[2];
+      h += '<div class="ship"><div>🚚 ' + esc(it.courier || '택배') + '<b>' + esc(it.track) + '</b></div><a class="btn" href="' + esc(trackUrl(it)) + '" target="_blank" rel="noopener"' + (cp ? ' onclick="cpTrk(\'' + esc(trkNo(it)) + '\', this)"' : '') + '>배송 조회</a></div>' +
+        '<div class="cpn" style="font-size:12px;color:#8b95a1;margin-top:4px;text-align:right">' + (cp ? '누르면 송장번호가 복사돼요 · ' : '') + '<a href="' + esc(naverUrl(it)) + '" target="_blank" rel="noopener" style="color:inherit">네이버에서 조회</a></div>'; }
     return h + '</div>';
   }
 

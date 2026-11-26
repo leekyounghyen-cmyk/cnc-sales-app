@@ -122,6 +122,8 @@
 <script>
   var API = 'https://script.google.com/macros/s/AKfycbw6Qsi7ZVZktH4xutPdGWHkYaM1u2nw6HGJDN3u8mBQVk0sbqBTpPliLXGwn20O_ix8/exec';
   var STEPS = ['입고', '점검·견적', '수리', '출고 준비', '출고'];
+  var STEPS_D = ['접수', '진단', '복구', '복구완료', '발송'];   // 데이터복구는 「복구 현황」 단계로 (2026-11-26)
+  function isD(it) { return it && it.team === '데이터복구'; }
   var K = (new URLSearchParams(location.search).get('k') || '').toLowerCase();
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -149,37 +151,37 @@
   }
 
   function card(it) {
-    var done = it.sg === 4, h = '<div class="card' + (done ? ' done' : '') + '">';
+    var done = it.sg === 4, D = isD(it), OUT = D ? '발송' : '출고', h = '<div class="card' + (done ? ' done' : '') + '">';
     h += '<div class="top"><span class="team">' + esc(it.team) + '</span>접수번호 ' + esc(it.no) + (it.sn ? ' · S/N ' + esc(it.sn) : '') + '</div>';
-    h += '<div class="name">' + esc(it.name || '수리 장비') + '</div>';
+    h += '<div class="name">' + esc(it.name || (D ? '복구 장비' : '수리 장비')) + '</div>';
     h += '<div class="msg">' + esc(it.msg) + '</div>';
-    if (done && it.dOut) h += '<div class="eta"><b>' + md(it.dOut, true) + '</b> 출고</div>';
-    else if (it.plan) h += '<div class="eta">출고 예정 <b>' + md(it.plan, true) + '</b></div>';
-    else if (it.sg < 3) h += '<div class="eta">' + (it.qok ? '출고 예정일을 곧 안내드릴게요' : '견적을 확정해 주시면 출고 예정일을 안내드려요') + '</div>';
+    if (done && it.dOut) h += '<div class="eta"><b>' + md(it.dOut, true) + '</b> ' + OUT + '</div>';
+    else if (it.plan) h += '<div class="eta">' + OUT + ' 예정 <b>' + md(it.plan, true) + '</b></div>';
+    else if (it.sg < 3) h += '<div class="eta">' + (it.qok ? OUT + ' 예정일을 곧 안내드릴게요' : '견적을 확정해 주시면 ' + OUT + ' 예정일을 안내드려요') + '</div>';
     // 예정보다 빨리: 출고 예정일보다 일찍 출고 / 예정일 전에 수리 끝남
     if (done && it.dOut && it.plan) {
       var ed = dd(it.dOut, it.plan);
-      if (ed > 0) h += '<div class="early"><i>🎉</i><div><b>예정보다 ' + ed + '일 빨리 출고됐어요!</b><small>출고 예정 ' + md(it.plan, true) + ' → 실제 출고 ' + md(it.dOut, true) + '</small></div></div>';
-      else if (ed === 0) h += '<div class="ontime">✓ 약속한 날짜에 맞춰 출고했어요</div>';
-    } else if (!done && it.sg === 3 && it.plan && /수리/.test(it.msg)) {
+      if (ed > 0) h += '<div class="early"><i>🎉</i><div><b>예정보다 ' + ed + '일 빨리 ' + OUT + '됐어요!</b><small>' + OUT + ' 예정 ' + md(it.plan, true) + ' → 실제 ' + OUT + ' ' + md(it.dOut, true) + '</small></div></div>';
+      else if (ed === 0) h += '<div class="ontime">✓ 약속한 날짜에 맞춰 ' + OUT + '했어요</div>';
+    } else if (!done && it.sg === 3 && it.plan && /수리|복구/.test(it.msg)) {
       var sd = dd(today(), it.plan);
-      if (sd > 0) h += '<div class="early soon"><i>⚡</i><div><b>예정보다 빨리 수리가 끝났어요!</b><small>출고 예정 ' + md(it.plan, true) + '보다 ' + sd + '일 앞서 출고를 준비하고 있어요</small></div></div>';
+      if (sd > 0) h += '<div class="early soon"><i>⚡</i><div><b>예정보다 빨리 ' + (D ? '복구가' : '수리가') + ' 끝났어요!</b><small>' + OUT + ' 예정 ' + md(it.plan, true) + '보다 ' + sd + '일 앞서 ' + OUT + '을 준비하고 있어요</small></div></div>';
     }
     // 진행 단계
     var stepDate = [it.dIn, '', '', it.fix, it.dOut];
     h += '<div class="steps"><div class="bar" style="width:calc((100% - 24px) * ' + (it.sg / 4) + ')"></div>';
-    STEPS.forEach(function (s, i) {
+    (D ? STEPS_D : STEPS).forEach(function (s, i) {
       var on = i <= it.sg, now = i === it.sg;
       h += '<div class="st' + (on ? ' on' : '') + (now ? ' now' : '') + '"><i>' + (on && !now ? '✓' : '') + '</i><span>' + s + '</span>' + (on && stepDate[i] ? '<small>' + md(stepDate[i]) + '</small>' : '') + '</div>';
     });
     h += '</div>';
     // 날짜
     var dc = function (lab, d, none) { return '<div' + (d ? '' : ' class="no"') + '><em>' + lab + '</em><b>' + (d ? md(d, true) : (none || '미정')) + '</b></div>'; };
-    h += '<div class="dates">' + dc('맡긴 날', it.dIn) + dc('출고 예정', done ? (it.plan || it.dOut) : it.plan, !done && !it.qok && it.sg < 3 ? '견적 확정 후' : '') + dc('출고일', it.dOut) + '</div>';
+    h += '<div class="dates">' + dc('맡긴 날', it.dIn) + dc(OUT + ' 예정', done ? (it.plan || it.dOut) : it.plan, !done && !it.qok && it.sg < 3 ? '견적 확정 후' : '') + dc(OUT + '일', it.dOut) + '</div>';
     // 견적 금액
-    if (it.price != null || it.free) h += '<div class="row"><em>견적 금액</em><b>' + (it.free ? '무상 수리' : won(it.price) + ' <small>VAT 별도</small>') + '</b></div>';
+    if (it.price != null || it.free) h += '<div class="row"><em>견적 금액</em><b>' + (it.free ? (D ? '무상' : '무상 수리') : won(it.price) + ' <small>VAT 별도</small>') + '</b></div>';
     if (it.sym) h += '<div class="note"><em>입고 증상</em>' + esc(it.sym) + '</div>';
-    if (it.work) h += '<div class="note"><em>수리 내용</em>' + esc(it.work) + '</div>';
+    if (it.work) h += '<div class="note"><em>' + (D ? '복구 내용' : '수리 내용') + '</em>' + esc(it.work) + '</div>';
     if (it.ph && it.ph.length) {
       h += '<div class="phs"><em>📷 이렇게 수리했어요 · 눌러서 크게 보기</em><div class="phg">' + it.ph.map(function (p) {
         PH[p.id] = p; return '<button type="button" onclick="lbOpen(\'' + esc(p.id) + '\')"><img src="' + p.th + '" alt="수리 ' + p.s + ' 사진" loading="lazy"><span' + (p.s === '후' ? ' class="a"' : '') + '>수리 ' + p.s + '</span></button>';
@@ -241,24 +243,26 @@
     return { co: '(예시) 한빛물류', at: (t.getMonth() + 1) + '월 ' + t.getDate() + '일 ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2), rep: [{ n: '홍길동', p: '01012345678' }], items: [
       { team: '라벨프린터', no: '474', name: 'ZEBRA 라벨프린터 ZT410', sn: '…7Q21', dIn: f(-3), qok: f(-1), plan: f(13), fix: '', dOut: '', sg: 2, msg: '부품을 준비하고 있어요', sym: '인쇄 시 줄이 생기고 라벨 감지가 잘 안 돼요', work: '프린트 헤드 교체 예정', price: 385000, free: false },
       { team: '유상 PDA', no: '4255', name: 'ZEBRA PDA TC52', sn: '…0931', dIn: f(-1), qok: '', plan: '', fix: '', dOut: '', sg: 1, msg: '점검 후 견적을 안내드릴 예정이에요', sym: '충전이 안 돼요', work: '', price: null, free: false },
+      { team: '데이터복구', no: '2611', name: '외장 HDD 2TB', sn: '', dIn: f(-4), plan: f(2), fix: '', dOut: '', sg: 2, msg: '데이터를 복구하고 있어요', sym: '인식이 안 돼요', work: '배드섹터 이미징 진행', price: 350000, free: false },
       { team: '유상 PDA', no: '4232', name: 'ZEBRA PDA MC3300', sn: '…5520', dIn: f(-11), plan: f(1), fix: f(-3), dOut: f(-2), sg: 4, msg: '출고됐어요', sym: '', work: '스캔엔진 교체, 동작 테스트 완료', price: 210000, free: false, courier: 'CJ대한통운', track: '512345678901' }
     ] };
   }
   function draw(d) {
     $('at').innerHTML = esc(d.at) + ' 기준 · <button class="reload" onclick="load()">새로고침</button>';
     var go = d.items.filter(function (x) { return x.sg < 4; }), out = d.items.filter(function (x) { return x.sg === 4; });
-    var h = '<div class="hello"><h1>' + esc(d.co) + '<br>고객님의 수리 현황이에요</h1>' +
-      '<p>' + (go.length ? '지금 ' + go.length + '대를 수리하고 있어요' : '진행 중인 수리가 없어요') + '</p></div>' + contactHtml(d.rep);
-    h += '<div class="sumrow"><div><em>진행 중</em><b>' + go.length + '대</b></div><div><em>최근 출고</em><b>' + out.length + '대</b></div></div>';
+    var AD = d.items.length > 0 && d.items.every(isD), W = AD ? '복구' : '수리', O = AD ? '발송' : '출고';   // 데이터복구만 맡긴 고객은 「복구 현황」
+    var h = '<div class="hello"><h1>' + esc(d.co) + '<br>고객님의 ' + W + ' 현황이에요</h1>' +
+      '<p>' + (go.length ? '지금 ' + go.length + '대를 ' + W + '하고 있어요' : '진행 중인 ' + W + '가 없어요') + '</p></div>' + contactHtml(d.rep);
+    h += '<div class="sumrow"><div><em>진행 중</em><b>' + go.length + '대</b></div><div><em>최근 ' + O + '</em><b>' + out.length + '대</b></div></div>';
     if (!d.items.length) h += '<div class="empty" style="margin-top:14px"><b>표시할 장비가 없어요</b>최근 90일 안에 맡기신 장비가 없거나 아직 등록 전이에요.</div>';
-    if (go.length) h += '<div class="sec">수리 진행 중</div>' + go.map(card).join('');
+    if (go.length) h += '<div class="sec">' + W + ' 진행 중</div>' + go.map(card).join('');
     if (out.length) {
-      h += '<div class="sec">최근 출고 <span style="font-weight:500;color:var(--mut);font-size:13px">· 90일</span></div>' + out.slice(0, 5).map(card).join('');
-      if (out.length > 5) h += '<div id="moreBox" hidden>' + out.slice(5).map(card).join('') + '</div><button class="more" onclick="this.previousElementSibling.hidden=false;this.remove()">출고된 장비 ' + (out.length - 5) + '대 더 보기</button>';
+      h += '<div class="sec">최근 ' + O + ' <span style="font-weight:500;color:var(--mut);font-size:13px">· 90일</span></div>' + out.slice(0, 5).map(card).join('');
+      if (out.length > 5) h += '<div id="moreBox" hidden>' + out.slice(5).map(card).join('') + '</div><button class="more" onclick="this.previousElementSibling.hidden=false;this.remove()">' + O + '된 장비 ' + (out.length - 5) + '대 더 보기</button>';
     }
     if (DEMO) h = '<div class="demo">👀 예시 화면이에요 · 실제 고객 데이터가 아니에요</div>' + h;
     $('app').innerHTML = h; $('more').innerHTML = moreHtml(d.items);
-    document.title = d.co + ' · 씨앤씨 수리 진행 현황';
+    document.title = d.co + ' · 씨앤씨 ' + W + ' 진행 현황';
   }
   function fail(t) { $('app').innerHTML = '<div class="hello"></div><div class="err"><b>현황을 볼 수 없어요</b>' + esc(t) + '</div>'; }
   function load() {
